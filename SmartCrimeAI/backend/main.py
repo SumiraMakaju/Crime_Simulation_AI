@@ -218,12 +218,11 @@ def main() -> None:  # noqa: C901 — intentionally monolithic orchestrator
                         zone.risk_score > PATROL_EFFICIENCY_RISK_THRESHOLD
                     )
 
-                # g. Check for caught crimes ──────────────────────────────
+                # g. Check for caught crimes (immediate intercepts) ────────
                 for event in new_crimes:
                     zone = env.get_zone(event.zone_id)
                     if zone.police_count > 0:
                         crime_log.mark_caught(event.crime_id, env.tick - event.tick)
-                        metric_logger.total_caught += 1
                         # Penalise the criminal who committed the crime
                         for crim in criminals:
                             if crim.zone_id == event.zone_id and getattr(crim, "state", "") != "laying_low":
@@ -234,6 +233,22 @@ def main() -> None:  # noqa: C901 — intentionally monolithic orchestrator
                                 crim.lay_low_timer = MAX_CRIMINAL_LAY_LOW
                                 crim.state = "laying_low"
                                 break
+
+                # Synchronize metric_logger with all caught events in crime_log
+                # This ensures both immediate catches AND responded catches (after travel) are counted!
+                caught_events = [e for e in crime_log.events if e.caught]
+                if len(caught_events) > metric_logger.total_caught:
+                    metric_logger.total_caught = len(caught_events)
+                    metric_logger.response_times = [
+                        e.response_time for e in caught_events if e.response_time is not None
+                    ]
+                    # Update mode-specific metrics
+                    new_catches = len(caught_events) - sum(
+                        metric_logger.mode_counters[m]["caught"] for m in metric_logger.mode_counters
+                    )
+                    if new_catches > 0:
+                        patrol_mode = getattr(scenario_engine, "patrol_mode", "greedy")
+                        metric_logger.mode_counters[patrol_mode]["caught"] += new_catches
 
                 # h. Online retrain check ─────────────────────────────────
                 dataset_size = len(crime_log.events) * 3  # ~3 CSV rows per crime
