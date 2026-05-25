@@ -674,6 +674,8 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 844574061}
+  - component: {fileID: 844574063}
+  - component: {fileID: 844574062}
   m_Layer: 0
   m_Name: SimulationRoot
   m_TagString: Untagged
@@ -703,6 +705,30 @@ Transform:
   - {fileID: 489754754}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &844574062
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 844574060}
+  m_Enabled: 0
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 29ba598d77a13ec458ce93a07e66844e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ConnectionTest
+--- !u!114 &844574063
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 844574060}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6af1791a40c95194bb1f64210088507c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ApiClient
 --- !u!1 &941013431
 GameObject:
   m_ObjectHideFlags: 0
