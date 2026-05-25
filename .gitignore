@@ -104,3 +104,32 @@ InitTestScene*.unity*
 
 # Auto-generated cache in Assets folder
 /[Aa]ssets/[Ss]ceneDependencyCache*
+
+# ==========================================
+# Python Backend Ignores
+# ==========================================
+
+# Virtual Environment
+SmartCrimeAI/backend/venv/
+venv/
+ENV/
+env/
+
+# Python caching and byte-code
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Simulation Output (datasets, models, and policies)
+SmartCrimeAI/backend/output/
+SmartCrimeAI/backend/shared/zone_config.json
+**/output/
+**/shared/zone_config.json
+
+# Developer environments / tools
+.idea/
+.vscode/
+.pytest_cache/
+.ipynb_checkpoints/

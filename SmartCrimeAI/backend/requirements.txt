@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+scikit-learn
+stable-baselines3[extra]
+gymnasium
+pandas
+numpy
+joblib
