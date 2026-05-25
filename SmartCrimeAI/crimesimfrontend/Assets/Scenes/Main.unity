@@ -676,6 +676,7 @@ GameObject:
   - component: {fileID: 844574061}
   - component: {fileID: 844574063}
   - component: {fileID: 844574062}
+  - component: {fileID: 844574064}
   m_Layer: 0
   m_Name: SimulationRoot
   m_TagString: Untagged
@@ -729,6 +730,24 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6af1791a40c95194bb1f64210088507c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ApiClient
+--- !u!114 &844574064
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 844574060}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4ddf783104ece8a41ad4434806a349d1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CityBuilder
+  residentialPrefab: {fileID: 1760793936012474079, guid: 9a57f27c88ebb7842b130d9f826e5dcc, type: 3}
+  commercialPrefab: {fileID: 5687680524876316064, guid: 8ffd00e3c45332545a388fd870dba38e, type: 3}
+  parkPrefab: {fileID: 9005707743322353087, guid: c2fdf9036923a4a4092b35237b8e2f4a, type: 3}
+  intersectionPrefab: {fileID: 6857015794679112196, guid: b0fb0187bf688bd408076c8aa2abe7ae, type: 3}
+  cityParent: {fileID: 1016084433}
+  zoneConfigRelativePath: ../../../../backend/shared/zone_config.json
 --- !u!1 &941013431
 GameObject:
   m_ObjectHideFlags: 0
