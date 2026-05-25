@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional
 import numpy as np
 from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -79,6 +80,14 @@ def _zone_dict(zone: Any) -> Dict[str, Any]:
 
 def _crime_event_dict(event: Any) -> Dict[str, Any]:
     """Serialise a crime event to a JSON-safe dictionary."""
+    if isinstance(event, dict):
+        return {
+            "id": str(event.get("crime_id", "")),
+            "zone": str(event.get("zone_id", "")),
+            "time_of_day": _to_native(event.get("time_of_day", 0.0)),
+            "type": str(event.get("crime_type", "unknown")),
+            "caught": bool(event.get("caught", False)),
+        }
     return {
         "id": str(getattr(event, "crime_id", "")),
         "zone": str(getattr(event, "zone_id", "")),
@@ -224,4 +233,823 @@ def create_app(sim_state: SimulationState) -> FastAPI:
             except Exception as exc:  # noqa: BLE001
                 return {"status": "error", "detail": str(exc)}
 
+    # ── GET / (HTML Dashboard) ──────────────────────────────────────────
+
+    @app.get("/", response_class=HTMLResponse)
+    def serve_dashboard() -> str:
+        """Serve a gorgeous dark-mode web control center to visualize the simulation."""
+        return DASHBOARD_HTML
+
     return app
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Built-in High-Fidelity Web Dashboard (HTML / CSS / JS)
+# ─────────────────────────────────────────────────────────────────────────────
+
+DASHBOARD_HTML = """<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart Crime Prediction & Patrol Optimizer — Control Room</title>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-dark: #070b13;
+      --card-bg: rgba(17, 24, 39, 0.7);
+      --border: rgba(255, 255, 255, 0.08);
+      --text-primary: #f8fafc;
+      --text-secondary: #94a3b8;
+      --accent-blue: #3b82f6;
+      --accent-green: #10b981;
+      --accent-red: #ef4444;
+      --accent-orange: #f59e0b;
+      --accent-purple: #8b5cf6;
+      
+      --zone-res: #1e293b;
+      --zone-com: #2e1065;
+      --zone-park: #064e3b;
+      --zone-int: #0f172a;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Outfit', sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      background-image: 
+        radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.08) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(139, 92, 246, 0.08) 0px, transparent 50%);
+      color: var(--text-primary);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+    }
+
+    /* Header styling */
+    header {
+      backdrop-filter: blur(12px);
+      background: rgba(15, 23, 42, 0.6);
+      border-bottom: 1px solid var(--border);
+      padding: 1.25rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .brand-logo {
+      width: 2.25rem;
+      height: 2.25rem;
+      border-radius: 0.5rem;
+      background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 1.25rem;
+      box-shadow: 0 0 15px rgba(59, 130, 246, 0.4);
+    }
+
+    .brand-text h1 {
+      font-size: 1.25rem;
+      font-weight: 600;
+      letter-spacing: -0.025em;
+    }
+
+    .brand-text p {
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .header-telemetry {
+      display: flex;
+      gap: 1.5rem;
+      align-items: center;
+    }
+
+    .tel-item {
+      text-align: right;
+    }
+
+    .tel-lbl {
+      font-size: 0.7rem;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .tel-val {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .tel-val.mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* Main Container */
+    .dashboard-container {
+      flex: 1;
+      padding: 2rem;
+      max-width: 1400px;
+      margin: 0 auto;
+      width: 100%;
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 2rem;
+    }
+
+    @media (max-width: 1024px) {
+      .dashboard-container {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Card Styling */
+    .glass-card {
+      backdrop-filter: blur(12px);
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 1rem;
+      padding: 1.5rem;
+      box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2);
+    }
+
+    .card-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-bottom: 1.25rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 0.75rem;
+    }
+
+    /* Map Layout */
+    .map-container {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .grid-board {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      grid-template-rows: repeat(6, 1fr);
+      gap: 0.75rem;
+      aspect-ratio: 1;
+      width: 100%;
+    }
+
+    .zone-cell {
+      border-radius: 0.75rem;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      padding: 0.75rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      position: relative;
+      overflow: hidden;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      cursor: pointer;
+    }
+
+    .zone-cell:hover {
+      transform: translateY(-2px);
+      border-color: rgba(255, 255, 255, 0.2);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    }
+
+    .zone-cell.residential { background-color: var(--zone-res); }
+    .zone-cell.commercial { background-color: var(--zone-com); }
+    .zone-cell.park { background-color: var(--zone-park); }
+    .zone-cell.intersection { background-color: var(--zone-int); }
+
+    .zone-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+      z-index: 2;
+    }
+
+    .zone-id {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 600;
+      font-size: 0.9rem;
+    }
+
+    .zone-type-badge {
+      font-size: 0.6rem;
+      text-transform: uppercase;
+      padding: 0.15rem 0.35rem;
+      border-radius: 0.25rem;
+      background: rgba(255, 255, 255, 0.1);
+      color: var(--text-secondary);
+    }
+
+    .zone-risk {
+      font-size: 0.75rem;
+      font-weight: 500;
+      z-index: 2;
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+    }
+
+    .zone-agents {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.25rem;
+      margin-top: 0.5rem;
+      z-index: 2;
+      min-height: 1.5rem;
+      align-items: flex-end;
+    }
+
+    /* Hotspot glow pulse */
+    @keyframes hotspot-pulse {
+      0% { box-shadow: inset 0 0 10px rgba(239, 68, 68, 0.4), 0 0 5px rgba(239, 68, 68, 0.2); }
+      50% { box-shadow: inset 0 0 20px rgba(239, 68, 68, 0.8), 0 0 15px rgba(239, 68, 68, 0.5); }
+      100% { box-shadow: inset 0 0 10px rgba(239, 68, 68, 0.4), 0 0 5px rgba(239, 68, 68, 0.2); }
+    }
+
+    .zone-cell.hotspot {
+      animation: hotspot-pulse 2s infinite;
+      border: 1.5px solid var(--accent-red) !important;
+    }
+
+    /* Agent Badges */
+    .agent-dot {
+      width: 1.1rem;
+      height: 1.1rem;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.65rem;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+      cursor: help;
+      transition: all 0.2s;
+    }
+
+    .agent-dot:hover {
+      transform: scale(1.3);
+      z-index: 10;
+    }
+
+    .agent-dot.civilian { background-color: var(--accent-green); color: white; }
+    .agent-dot.police { background-color: var(--accent-blue); color: white; }
+    .agent-dot.criminal { background-color: var(--accent-orange); color: white; }
+
+    /* Side Panel Widgets */
+    .sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1rem;
+    }
+
+    .metric-card {
+      background: rgba(255,255,255, 0.02);
+      border: 1px solid var(--border);
+      border-radius: 0.75rem;
+      padding: 1rem;
+      text-align: center;
+    }
+
+    .metric-lbl {
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.25rem;
+    }
+
+    .metric-val {
+      font-size: 1.5rem;
+      font-weight: 700;
+    }
+
+    .metric-val.blue { color: var(--accent-blue); }
+    .metric-val.green { color: var(--accent-green); }
+    .metric-val.red { color: var(--accent-red); }
+    .metric-val.purple { color: var(--accent-purple); }
+
+    /* Controls Panel */
+    .controls-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    button {
+      flex: 1;
+      padding: 0.75rem 1rem;
+      border-radius: 0.5rem;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-primary);
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+    }
+
+    button:hover {
+      background: rgba(255, 255, 255, 0.15);
+      border-color: rgba(255, 255, 255, 0.3);
+      transform: translateY(-1px);
+    }
+
+    button:active {
+      transform: translateY(1px);
+    }
+
+    button.primary {
+      background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+      border: none;
+      box-shadow: 0 4px 10px rgba(59, 130, 246, 0.2);
+    }
+
+    button.primary:hover {
+      box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
+      filter: brightness(1.1);
+    }
+
+    button.danger {
+      background: rgba(239, 68, 68, 0.2);
+      border-color: rgba(239, 68, 68, 0.4);
+      color: #fca5a5;
+    }
+
+    button.danger:hover {
+      background: rgba(239, 68, 68, 0.4);
+      border-color: var(--accent-red);
+    }
+
+    /* Live Feed logs */
+    .log-feed {
+      height: 180px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      padding-right: 0.5rem;
+    }
+
+    .log-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.5rem;
+      border-radius: 0.35rem;
+      background: rgba(255, 255, 255, 0.02);
+      border-left: 3px solid #94a3b8;
+    }
+
+    .log-item.caught {
+      border-left-color: var(--accent-green);
+      background: rgba(16, 185, 129, 0.05);
+    }
+
+    .log-item.crime {
+      border-left-color: var(--accent-red);
+      background: rgba(239, 68, 68, 0.05);
+    }
+
+    /* Scrollbars */
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(0,0,0,0.1);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(255,255,255,0.15);
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(255,255,255,0.3);
+    }
+
+    /* Tooltip card on cell hover */
+    .tooltip-card {
+      position: absolute;
+      bottom: 105%;
+      left: 50%;
+      transform: translateX(-50%) scale(0.95);
+      background: #0f172a;
+      border: 1px solid var(--border);
+      border-radius: 0.5rem;
+      padding: 0.75rem;
+      width: 180px;
+      z-index: 100;
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+    }
+
+    .zone-cell:hover .tooltip-card {
+      opacity: 1;
+      transform: translateX(-50%) scale(1);
+    }
+
+    .tt-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 0.25rem;
+    }
+
+    .tt-val {
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top bar navigation -->
+  <header>
+    <div class="brand">
+      <div class="brand-logo">🕵️‍♂️</div>
+      <div class="brand-text">
+        <h1>Smart Crime Prediction</h1>
+        <p>Simulation Control & Telemetry Room</p>
+      </div>
+    </div>
+    <div class="header-telemetry">
+      <div class="tel-item">
+        <div class="tel-lbl">Simulation Time</div>
+        <div id="sim-time" class="tel-val mono">--:--</div>
+      </div>
+      <div class="tel-item">
+        <div class="tel-lbl">Grid Tick</div>
+        <div id="sim-tick" class="tel-val mono">0</div>
+      </div>
+      <div class="tel-item">
+        <div class="tel-lbl">Patrol Mode</div>
+        <div id="patrol-mode-badge" class="tel-val" style="color:var(--accent-purple)">Greedy</div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Dashboard Grid -->
+  <div class="dashboard-container">
+    
+    <!-- Left panel: Map Visualizer -->
+    <div class="glass-card map-container">
+      <div class="card-title">
+        <span>6×6 Virtual City Grid</span>
+        <span style="font-size: 0.8rem; font-weight: normal; color: var(--text-secondary);">
+          🟢 Civilian | 🔵 Police | 🟡 Criminal
+        </span>
+      </div>
+      <div id="board" class="grid-board">
+        <!-- Cells generated by JS -->
+      </div>
+    </div>
+
+    <!-- Right panel: Telemetry stats & Logs -->
+    <div class="sidebar">
+      
+      <!-- Metrics Card -->
+      <div class="glass-card">
+        <div class="card-title">Performance Metrics</div>
+        <div class="metrics-grid">
+          <div class="metric-card">
+            <div class="metric-lbl">Total Crimes</div>
+            <div id="m-total-crimes" class="metric-val red">0</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-lbl">Arrests / Intercepts</div>
+            <div id="m-caught-crimes" class="metric-val green">0</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-lbl">Intercept Rate</div>
+            <div id="m-catch-rate" class="metric-val purple">0.0%</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-lbl">Avg Response Time</div>
+            <div id="m-resp-time" class="metric-val blue">-- ticks</div>
+          </div>
+          <div class="metric-card" style="grid-column: span 2">
+            <div class="metric-lbl">Patrol Coverage Efficiency</div>
+            <div id="m-patrol-eff" class="metric-val" style="color: var(--accent-orange)">0.0%</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Controls Card -->
+      <div class="glass-card">
+        <div class="card-title">Scenario Interventions</div>
+        <div class="controls-panel">
+          <div class="btn-group">
+            <button onclick="setPatrolMode('greedy')" id="btn-mode-greedy" class="primary">Greedy Patrol</button>
+            <button onclick="setPatrolMode('ai')" id="btn-mode-ai">AI (RL) Patrol</button>
+          </div>
+          <div class="btn-group">
+            <button onclick="spawnPolice(1)">➕ Dispatch Officer</button>
+            <button onclick="spawnPolice(-1)" class="danger">➖ Recall Officer</button>
+          </div>
+          <div class="btn-group">
+            <button onclick="spawnCivilians(5)">🚶 Spawn Civilians (+5)</button>
+          </div>
+          <button onclick="resetMetrics()" class="danger" style="margin-top:0.5rem">🔄 Reset Statistics</button>
+        </div>
+      </div>
+
+      <!-- Crime Events Live Feed -->
+      <div class="glass-card">
+        <div class="card-title">Live Dispatch Feed</div>
+        <div id="log-feed" class="log-feed">
+          <!-- Populated by JS -->
+          <div style="color:var(--text-secondary); text-align:center; padding-top:2rem;">Waiting for logs...</div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <script>
+    // Initialize board cell placeholders
+    const board = document.getElementById('board');
+    const rows = ['A', 'B', 'C', 'D', 'E', 'F'];
+    
+    // Create 36 cells once, then update dynamic values
+    for (let r = 0; r < 6; r++) {
+      for (let c = 0; c < 6; c++) {
+        const id = `${rows[r]}${c}`;
+        const cell = document.createElement('div');
+        cell.id = `cell-${id}`;
+        cell.className = 'zone-cell';
+        cell.innerHTML = `
+          <div class="zone-header">
+            <span class="zone-id">${id}</span>
+            <span id="badge-${id}" class="zone-type-badge">-</span>
+          </div>
+          <div id="risk-${id}" class="zone-risk"></div>
+          <div id="agents-${id}" class="zone-agents"></div>
+          
+          <div class="tooltip-card">
+            <div class="tt-row">Type: <span id="tt-type-${id}" class="tt-val">-</span></div>
+            <div class="tt-row">Lighting: <span id="tt-light-${id}" class="tt-val">1.0</span></div>
+            <div class="tt-row">Population: <span id="tt-pop-${id}" class="tt-val">0</span></div>
+            <div class="tt-row">Police Count: <span id="tt-pol-${id}" class="tt-val">0</span></div>
+            <div class="tt-row">Risk Score: <span id="tt-risk-${id}" class="tt-val">0.0</span></div>
+          </div>
+        `;
+        board.appendChild(cell);
+      }
+    }
+
+    let activeCivilianCount = 30;
+
+    // Periodic polling function
+    async function poll() {
+      try {
+        const [stateRes, metricsRes] = await Promise.all([
+          fetch('/state'),
+          fetch('/metrics')
+        ]);
+        
+        const state = await stateRes.json();
+        const metrics = await metricsRes.json();
+        
+        // --- 1. Update Header Telemetry --------------------------------------
+        document.getElementById('sim-tick').innerText = state.tick;
+        
+        // Format simulation time nicely
+        const tod = state.time_of_day;
+        const hours = Math.floor(tod);
+        const mins = Math.floor((tod - hours) * 60);
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+        const displayHours = hours % 12 === 0 ? 12 : hours % 12;
+        const displayMins = mins < 10 ? '0' + mins : mins;
+        document.getElementById('sim-time').innerText = `${displayHours}:${displayMins} ${ampm}`;
+        
+        // Patrol mode badges
+        const mode = metrics.patrol_mode || 'greedy';
+        const modeBadge = document.getElementById('patrol-mode-badge');
+        modeBadge.innerText = mode.toUpperCase();
+        if (mode === 'ai') {
+          modeBadge.style.color = 'var(--accent-purple)';
+          document.getElementById('btn-mode-ai').className = 'primary';
+          document.getElementById('btn-mode-greedy').className = '';
+        } else {
+          modeBadge.style.color = 'var(--accent-blue)';
+          document.getElementById('btn-mode-greedy').className = 'primary';
+          document.getElementById('btn-mode-ai').className = '';
+        }
+
+        // --- 2. Update Grid Cells --------------------------------------------
+        const zonesMap = {};
+        state.zones.forEach(z => {
+          zonesMap[z.id] = z;
+        });
+
+        // Track civilian count
+        let civCount = 0;
+
+        for (let r = 0; r < 6; r++) {
+          for (let c = 0; c < 6; c++) {
+            const id = `${rows[r]}${c}`;
+            const zone = zonesMap[id];
+            const cell = document.getElementById(`cell-${id}`);
+            
+            if (!zone) continue;
+
+            // Reset type styles and assign current
+            cell.className = `zone-cell ${zone.zone_type}`;
+            document.getElementById(`badge-${id}`).innerText = zone.zone_type.substring(0, 4);
+
+            // Risk overlays
+            const riskContainer = document.getElementById(`risk-${id}`);
+            if (zone.risk_score > 0.05) {
+              const scorePct = Math.round(zone.risk_score * 100);
+              riskContainer.innerHTML = `<span style="color:#f87171">⚠️ ${scorePct}%</span>`;
+              // Gradient-shift background based on risk
+              const alpha = Math.min(zone.risk_score * 0.7, 0.95);
+              cell.style.backgroundColor = `rgba(239, 68, 68, ${alpha})`;
+            } else {
+              riskContainer.innerHTML = '';
+              cell.style.backgroundColor = '';
+            }
+
+            // Hotspot visual glow pulse
+            if (zone.is_hotspot) {
+              cell.classList.add('hotspot');
+            } else {
+              cell.classList.remove('hotspot');
+            }
+
+            // Update tooltip details
+            document.getElementById(`tt-type-${id}`).innerText = zone.zone_type;
+            document.getElementById(`tt-light-${id}`).innerText = zone.lighting.toFixed(2);
+            document.getElementById(`tt-pop-${id}`).innerText = zone.population;
+            document.getElementById(`tt-pol-${id}`).innerText = zone.police_count;
+            document.getElementById(`tt-risk-${id}`).innerText = zone.risk_score.toFixed(4);
+
+            // Clear agent display
+            const agentsContainer = document.getElementById(`agents-${id}`);
+            agentsContainer.innerHTML = '';
+          }
+        }
+
+        // --- 3. Render Agent Badges ------------------------------------------
+        state.agents.forEach(agent => {
+          const container = document.getElementById(`agents-${agent.zone}`);
+          if (container) {
+            const dot = document.createElement('span');
+            dot.className = `agent-dot ${agent.type}`;
+            
+            // Emoji mappings
+            let icon = '🚶';
+            if (agent.type === 'police') {
+              icon = '👮';
+              dot.title = `Officer: ${agent.id} (${agent.state})`;
+            } else if (agent.type === 'criminal') {
+              icon = '🦹';
+              dot.title = `Criminal: ${agent.id} (${agent.state})`;
+            } else {
+              civCount++;
+              dot.title = `Civilian: ${agent.id} (${agent.state})`;
+            }
+            
+            dot.innerText = icon;
+            container.appendChild(dot);
+          }
+        });
+
+        activeCivilianCount = civCount;
+
+        // --- 4. Update Sidebar Metrics ---------------------------------------
+        document.getElementById('m-total-crimes').innerText = metrics.total_crimes;
+        document.getElementById('m-caught-crimes').innerText = metrics.total_caught;
+        
+        const catchRate = metrics.catch_rate || 0.0;
+        document.getElementById('m-catch-rate').innerText = `${(catchRate * 100).toFixed(1)}%`;
+        
+        const avgResp = metrics.avg_response_time;
+        document.getElementById('m-resp-time').innerText = avgResp ? `${avgResp.toFixed(1)} ticks` : '-- ticks';
+        
+        const patrolEff = metrics.patrol_efficiency || 0.0;
+        document.getElementById('m-patrol-eff').innerText = `${(patrolEff * 100).toFixed(1)}%`;
+
+        // --- 5. Update Crime log Feed ----------------------------------------
+        const feed = document.getElementById('log-feed');
+        feed.innerHTML = '';
+        if (state.crime_events && state.crime_events.length > 0) {
+          state.crime_events.forEach(ev => {
+            const item = document.createElement('div');
+            item.className = `log-item ${ev.caught ? 'caught' : 'crime'}`;
+            
+            const timeStr = `[${ev.time_of_day.toFixed(2)}]`;
+            const caughtBadge = ev.caught ? '🟢 INTERCEPTED' : '🔴 ESCAPED';
+            
+            item.innerHTML = `
+              <span>${timeStr} <b>${ev.type.toUpperCase()}</b> in <b>${ev.zone}</b></span>
+              <span>${caughtBadge}</span>
+            `;
+            feed.appendChild(item);
+          });
+        } else {
+          feed.innerHTML = `<div style="color:var(--text-secondary); text-align:center; padding-top:2rem;">No crime events logged yet.</div>`;
+        }
+
+      } catch (err) {
+        console.error("Dashboard polling error: ", err);
+      }
+    }
+
+    // --- Control Interventions triggers ---------------------------------------
+    async function setPatrolMode(mode) {
+      await fetch('/scenario', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ set_patrol_mode: mode })
+      });
+      poll();
+    }
+
+    async function spawnPolice(count) {
+      if (count > 0) {
+        await fetch('/scenario', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ add_police: count })
+        });
+      } else {
+        await fetch('/scenario', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ remove_police: Math.abs(count) })
+        });
+      }
+      poll();
+    }
+
+    async function spawnCivilians(addAmount) {
+      const targetCount = activeCivilianCount + addAmount;
+      await fetch('/scenario', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ set_civilian_count: targetCount })
+      });
+      poll();
+    }
+
+    async function resetMetrics() {
+      await fetch('/scenario', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reset_metrics: true })
+      });
+      poll();
+    }
+
+    // Set polling interval (500ms aligns with SIMULATION_TICK_SLEEP = 0.5s)
+    setInterval(poll, 500);
+    // Initial run
+    poll();
+  </script>
+</body>
+</html>
+"""
