@@ -677,6 +677,7 @@ GameObject:
   - component: {fileID: 844574063}
   - component: {fileID: 844574062}
   - component: {fileID: 844574064}
+  - component: {fileID: 844574065}
   m_Layer: 0
   m_Name: SimulationRoot
   m_TagString: Untagged
@@ -748,6 +749,22 @@ MonoBehaviour:
   intersectionPrefab: {fileID: 6857015794679112196, guid: b0fb0187bf688bd408076c8aa2abe7ae, type: 3}
   cityParent: {fileID: 1016084433}
   zoneConfigRelativePath: ../../../../backend/shared/zone_config.json
+--- !u!114 &844574065
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 844574060}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d8de847bd588c794a8caf725c2b87711, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::AgentController
+  civilianPrefab: {fileID: 8512187361212266486, guid: eb68e40bf3f009b4b9a61be99a044f76, type: 3}
+  criminalPrefab: {fileID: 576182401037866960, guid: 7e9d22544dcaa8647894c435e7a4aa74, type: 3}
+  policePrefab: {fileID: 516844492726946596, guid: 556119e86fbdf334e9260259f3d8d870, type: 3}
+  agentsParent: {fileID: 167469206}
 --- !u!1 &941013431
 GameObject:
   m_ObjectHideFlags: 0

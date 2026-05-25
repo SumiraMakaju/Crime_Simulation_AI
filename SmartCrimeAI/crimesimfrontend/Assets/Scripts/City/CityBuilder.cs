@@ -129,7 +129,7 @@ public class CityBuilder : MonoBehaviour
 
     private void BakeNavMesh()
     {
-        var surface = FindObjectOfType<Unity.AI.Navigation.NavMeshSurface>();
+        var surface = FindFirstObjectByType<Unity.AI.Navigation.NavMeshSurface>();
         if (surface != null)
         {
             surface.BuildNavMesh();
