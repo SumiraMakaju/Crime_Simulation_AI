@@ -378,6 +378,7 @@ GameObject:
   - component: {fileID: 410087040}
   - component: {fileID: 410087042}
   - component: {fileID: 410087043}
+  - component: {fileID: 410087044}
   m_Layer: 0
   m_Name: Sunlight
   m_TagString: Untagged
@@ -506,6 +507,18 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a3c40f3a2625b1444addce1f4408c2a1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: '::'
+--- !u!114 &410087044
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 410087039}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 65e91398c15e2054c885ddedc615912e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DayNightController
 --- !u!1 &489754753
 GameObject:
   m_ObjectHideFlags: 0
@@ -546,6 +559,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 637629562}
+  - component: {fileID: 637629563}
   m_Layer: 0
   m_Name: PatrolLineRenderer
   m_TagString: Untagged
@@ -568,6 +582,18 @@ Transform:
   m_Children: []
   m_Father: {fileID: 844574061}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &637629563
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 637629561}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f380fed98bb5c7f4a91eb85c27dbc791, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PatrolLineRenderer
 --- !u!1 &724917369
 GameObject:
   m_ObjectHideFlags: 0
@@ -612,6 +638,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 766902681}
+  - component: {fileID: 766902682}
   m_Layer: 0
   m_Name: AgentController
   m_TagString: Untagged
@@ -634,6 +661,22 @@ Transform:
   m_Children: []
   m_Father: {fileID: 844574061}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &766902682
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 766902680}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d8de847bd588c794a8caf725c2b87711, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::AgentController
+  civilianPrefab: {fileID: 0}
+  criminalPrefab: {fileID: 0}
+  policePrefab: {fileID: 0}
+  agentsParent: {fileID: 0}
 --- !u!1 &802772598
 GameObject:
   m_ObjectHideFlags: 0
@@ -678,6 +721,9 @@ GameObject:
   - component: {fileID: 844574062}
   - component: {fileID: 844574064}
   - component: {fileID: 844574065}
+  - component: {fileID: 844574068}
+  - component: {fileID: 844574067}
+  - component: {fileID: 844574066}
   m_Layer: 0
   m_Name: SimulationRoot
   m_TagString: Untagged
@@ -726,7 +772,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 844574060}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 6af1791a40c95194bb1f64210088507c, type: 3}
   m_Name: 
@@ -738,7 +784,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 844574060}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 4ddf783104ece8a41ad4434806a349d1, type: 3}
   m_Name: 
@@ -756,7 +802,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 844574060}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: d8de847bd588c794a8caf725c2b87711, type: 3}
   m_Name: 
@@ -765,6 +811,53 @@ MonoBehaviour:
   criminalPrefab: {fileID: 576182401037866960, guid: 7e9d22544dcaa8647894c435e7a4aa74, type: 3}
   policePrefab: {fileID: 516844492726946596, guid: 556119e86fbdf334e9260259f3d8d870, type: 3}
   agentsParent: {fileID: 167469206}
+--- !u!114 &844574066
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 844574060}
+  m_Enabled: 0
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a12d715e56c1b3040bbb2a23f228ec47, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CrimeEventSpawner
+--- !u!114 &844574067
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 844574060}
+  m_Enabled: 0
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f380fed98bb5c7f4a91eb85c27dbc791, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PatrolLineRenderer
+--- !u!114 &844574068
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 844574060}
+  m_Enabled: 0
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d773eff0fa7f9e9498069664a3600aa1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SimulationManager
+  apiClient: {fileID: 0}
+  cityBuilder: {fileID: 0}
+  agentController: {fileID: 0}
+  patrolLineRenderer: {fileID: 0}
+  crimeEventSpawner: {fileID: 0}
+  dayNightController: {fileID: 0}
+  dashboardController: {fileID: 0}
+  statePollInterval: 0.5
+  metricsPollInterval: 2
+  startupDelay: 2
+  connectionStatusText: {fileID: 0}
 --- !u!1 &941013431
 GameObject:
   m_ObjectHideFlags: 0
@@ -774,6 +867,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 941013432}
+  - component: {fileID: 941013433}
   m_Layer: 0
   m_Name: CityBuilder
   m_TagString: Untagged
@@ -796,6 +890,24 @@ Transform:
   m_Children: []
   m_Father: {fileID: 844574061}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &941013433
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 941013431}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4ddf783104ece8a41ad4434806a349d1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CityBuilder
+  residentialPrefab: {fileID: 0}
+  commercialPrefab: {fileID: 0}
+  parkPrefab: {fileID: 0}
+  intersectionPrefab: {fileID: 0}
+  cityParent: {fileID: 0}
+  zoneConfigRelativePath: ../../../../backend/shared/zone_config.json
 --- !u!1 &966438606
 GameObject:
   m_ObjectHideFlags: 0
@@ -805,6 +917,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 966438607}
+  - component: {fileID: 966438608}
   m_Layer: 0
   m_Name: CrimeEventSpawner
   m_TagString: Untagged
@@ -827,6 +940,18 @@ Transform:
   m_Children: []
   m_Father: {fileID: 844574061}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &966438608
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 966438606}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a12d715e56c1b3040bbb2a23f228ec47, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CrimeEventSpawner
 --- !u!1 &1016084432
 GameObject:
   m_ObjectHideFlags: 0
@@ -1032,6 +1157,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1410768038}
+  - component: {fileID: 1410768039}
   m_Layer: 0
   m_Name: ApiClient
   m_TagString: Untagged
@@ -1054,6 +1180,18 @@ Transform:
   m_Children: []
   m_Father: {fileID: 844574061}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1410768039
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1410768037}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6af1791a40c95194bb1f64210088507c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ApiClient
 --- !u!1 &1614419663
 GameObject:
   m_ObjectHideFlags: 0
@@ -1239,6 +1377,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 2040105187}
+  - component: {fileID: 2040105188}
   m_Layer: 0
   m_Name: SimulationManager
   m_TagString: Untagged
@@ -1261,6 +1400,29 @@ Transform:
   m_Children: []
   m_Father: {fileID: 844574061}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &2040105188
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2040105186}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d773eff0fa7f9e9498069664a3600aa1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SimulationManager
+  apiClient: {fileID: 1410768039}
+  cityBuilder: {fileID: 941013433}
+  agentController: {fileID: 766902682}
+  patrolLineRenderer: {fileID: 637629563}
+  crimeEventSpawner: {fileID: 966438608}
+  dayNightController: {fileID: 0}
+  dashboardController: {fileID: 0}
+  statePollInterval: 0.5
+  metricsPollInterval: 2
+  startupDelay: 2
+  connectionStatusText: {fileID: 0}
 --- !u!1 &2094159322
 GameObject:
   m_ObjectHideFlags: 0
