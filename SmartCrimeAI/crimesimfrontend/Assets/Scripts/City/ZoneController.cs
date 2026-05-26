@@ -24,20 +24,18 @@ public class ZoneController : MonoBehaviour
     private static readonly Color ColorOrange = new Color(0.95f, 0.50f, 0.05f, 0.55f);
     private static readonly Color ColorRed = new Color(0.90f, 0.10f, 0.10f, 0.70f);
 
-    
+
     void Awake()
     {
-        // Find HeatmapPlane child
         var heatPlane = transform.Find("HeatmapPlane");
         if (heatPlane != null)
+        {
             _heatmapRenderer = heatPlane.GetComponent<Renderer>();
-        else
-            Debug.LogWarning($"[ZoneController] {ZoneId}: No child named 'HeatmapPlane' found.");
+            // Set starting color to fully transparent
+            _heatmapRenderer.material.color = new Color(0, 0, 0, 0);
+        }
 
-        // Find street light child
         _streetLight = GetComponentInChildren<Light>();
-
-        // Start green (no risk) and full brightness
         _targetColor = ColorGreen;
         _targetLightIntensity = 1.5f;
     }
