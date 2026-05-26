@@ -15,6 +15,7 @@ public class CityBuilder : MonoBehaviour
     public GameObject commercialPrefab;
     public GameObject parkPrefab;
     public GameObject intersectionPrefab;
+    public bool IsReady { get; private set; } = false;
 
     [Header("Parent transform for all spawned zones")]
     public Transform cityParent;   // drag the City GameObject here
@@ -123,7 +124,9 @@ public class CityBuilder : MonoBehaviour
         _built = true;
         Debug.Log($"[CityBuilder] Built {ZoneObjects.Count} zones successfully.");
 
-
+        _built = true;
+        IsReady = true;  // add this line
+        Debug.Log($"[CityBuilder] Built {ZoneObjects.Count} zones successfully.");
         BakeNavMesh();
     }
 

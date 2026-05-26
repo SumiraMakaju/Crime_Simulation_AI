@@ -104,7 +104,7 @@ public class SimulationManager : MonoBehaviour
             agentController.UpdateAgents(state.agents);
 
         //   2. Zones (heatmap + lighting)  
-        if (cityBuilder != null)
+        if (cityBuilder != null && cityBuilder.IsReady)
         {
             foreach (var zoneData in state.zones)
             {
