@@ -5,182 +5,228 @@ using TMPro;
 
 public class CrimeEventSpawner : MonoBehaviour
 {
-    [Header("Marker Prefabs")]
-    public GameObject crimeMarkerPrefab;      // red spike
-    public GameObject interceptMarkerPrefab;  // green spike
-
     [Header("Settings")]
-    public float markerLifetime = 10f;   // seconds before fade starts
-    public float fadeDuration = 3f;    // seconds to fade out
-    public float pulseSpeed = 3f;    // how fast marker pulses
-    public float pulseScaleAmount = 0.15f; // how much it scales up/down
-     
+    public float markerLifetime = 8f;
+    public float riseHeight = 4f;
+    public float pulseSpeed = 4f;
+
     private HashSet<string> _spawnedIds = new();
     private CityBuilder _cityBuilder;
 
- 
-    void Awake()
+    void Start()
     {
-        _cityBuilder = FindObjectOfType<CityBuilder>();
-    }
+        _cityBuilder = FindFirstObjectByType<CityBuilder>();
 
+        if (_cityBuilder == null)
+            Debug.LogError("[CrimeSpawner] CityBuilder not found in scene!");
+        else
+            Debug.Log($"[CrimeSpawner] CityBuilder found. IsReady={_cityBuilder.IsReady}. Keys: {_cityBuilder.ZoneConfigs.Count}");
+    }
 
     public void ProcessEvents(List<CrimeEventData> events)
     {
-        if (events == null) return;
+        if (events == null || events.Count == 0) return;
 
-        // Wait until CityBuilder has finished loading zones
-        if (_cityBuilder == null || !_cityBuilder.IsReady) return;
+        if (_cityBuilder == null)
+        {
+            _cityBuilder = FindFirstObjectByType<CityBuilder>();
+            return;
+        }
+
+        if (!_cityBuilder.IsReady || _cityBuilder.ZoneConfigs.Count == 0) return;
 
         foreach (var evt in events)
         {
             if (_spawnedIds.Contains(evt.id)) continue;
             _spawnedIds.Add(evt.id);
-            SpawnMarker(evt);
+            StartCoroutine(SpawnAlert(evt));
         }
     }
-
-    private void SpawnMarker(CrimeEventData evt)
+    private IEnumerator SpawnAlert(CrimeEventData evt)
     {
-        if (_cityBuilder == null) return;
-
-        // Look up zone world position
+        Debug.Log($"[CrimeSpawner] Spawning alert for zone='{evt.zone}' type='{evt.type}' caught={evt.caught}");
+        Debug.Log($"[CrimeSpawner] ZoneConfigs has {_cityBuilder.ZoneConfigs.Count} entries: {string.Join(", ", _cityBuilder.ZoneConfigs.Keys)}");
         if (!_cityBuilder.ZoneConfigs.TryGetValue(evt.zone, out var cfg))
         {
-            Debug.LogWarning($"[CrimeSpawner] Zone {evt.zone} not found in config.");
-            return;
+            // Try uppercase version just in case
+            string upper = evt.zone.ToUpper();
+            if (!_cityBuilder.ZoneConfigs.TryGetValue(upper, out cfg))
+            {
+                Debug.LogWarning($"[CrimeSpawner] Zone '{evt.zone}' not in ZoneConfigs. " +
+                                 $"Keys: {string.Join(", ", _cityBuilder.ZoneConfigs.Keys)}");
+                yield break;
+            }
         }
 
-        // Pick prefab based on whether criminal was caught
-        GameObject prefab = evt.caught ? interceptMarkerPrefab : crimeMarkerPrefab;
+        //  Build the marker from primitives 
+        float randX = Random.Range(-1.5f, 1.5f);
+        float randZ = Random.Range(-1.5f, 1.5f);
+        Vector3 spawnPos = new Vector3(cfg.world_x + 5f + randX, 0f, cfg.world_z + 5f + randZ);
 
-        if (prefab == null)
-        {
-            Debug.LogWarning("[CrimeSpawner] Marker prefab not assigned!");
-            return;
-        }
+        Color markerColor = evt.caught
+            ? new Color(0.0f, 1.0f, 0.3f)   // green = caught
+            : new Color(1.0f, 0.15f, 0.15f); // red   = escaped
 
-        // Spawn at zone center, slightly randomized so overlapping events
-        // are still visible
-        float randX = Random.Range(-2f, 2f);
-        float randZ = Random.Range(-2f, 2f);
-        Vector3 spawnPos = new Vector3(
-            cfg.world_x + 5f + randX,
-            0f,
-            cfg.world_z + 5f + randZ);
+        // Root object
+        GameObject root = new GameObject($"Alert_{evt.id}");
+        root.transform.position = spawnPos;
+        root.transform.SetParent(transform);
 
-        GameObject marker = Instantiate(prefab, spawnPos, Quaternion.identity, transform);
-        marker.name = $"Crime_{evt.id}";
+        // Spike body
+        GameObject spike = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        spike.name = "Spike";
+        spike.transform.SetParent(root.transform);
+        spike.transform.localPosition = new Vector3(0, 1.5f, 0);
+        spike.transform.localScale = new Vector3(0.25f, 3f, 0.25f);
+        Destroy(spike.GetComponent<Collider>());
+        SetMaterialColor(spike, markerColor);
 
-        // Set label text
-        var label = marker.GetComponentInChildren<TextMeshPro>();
-        if (label != null)
-        {
-            label.text = FormatCrimeLabel(evt);
-            label.color = evt.caught ? Color.green : Color.red;
-        }
+        // Diamond top
+        GameObject diamond = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        diamond.name = "Diamond";
+        diamond.transform.SetParent(root.transform);
+        diamond.transform.localPosition = new Vector3(0, 3.2f, 0);
+        diamond.transform.localScale = new Vector3(0.55f, 0.55f, 0.55f);
+        diamond.transform.localEulerAngles = new Vector3(45f, 45f, 0f);
+        Destroy(diamond.GetComponent<Collider>());
+        SetMaterialColor(diamond, markerColor);
 
-        // Start pulse + lifetime coroutines
-        StartCoroutine(PulseMarker(marker));
-        StartCoroutine(LifetimeAndFade(marker, markerLifetime, fadeDuration));
+        // Glow light
+        GameObject lightGo = new GameObject("GlowLight");
+        lightGo.transform.SetParent(root.transform);
+        lightGo.transform.localPosition = new Vector3(0, 2f, 0);
+        Light glow = lightGo.AddComponent<Light>();
+        glow.type = LightType.Point;
+        glow.color = markerColor;
+        glow.intensity = 4f;
+        glow.range = 10f;
+
+        // World-space TMP label
+        GameObject labelGo = new GameObject("Label");
+        labelGo.transform.SetParent(root.transform);
+        labelGo.transform.localPosition = new Vector3(0, 4.5f, 0);
+        labelGo.transform.localScale = new Vector3(0.08f, 0.08f, 0.08f);
+        TextMeshPro tmp = labelGo.AddComponent<TextMeshPro>();
+        tmp.text = BuildAlertText(evt);
+        tmp.color = markerColor;
+        tmp.fontSize = 28;
+        tmp.alignment = TextAlignmentOptions.Center;
+        tmp.fontStyle = FontStyles.Bold;
+
+        // Always face camera
+        labelGo.AddComponent<FaceCamera>();
+
+        //  Animate: spawn + pulse + fade 
+        yield return StartCoroutine(AnimateMarker(root, glow, tmp, markerColor));
     }
 
-    
-    private IEnumerator PulseMarker(GameObject marker)
+    private IEnumerator AnimateMarker(
+        GameObject root, Light glow, TextMeshPro tmp, Color baseColor)
     {
-        if (marker == null) yield break;
-
-        Vector3 baseScale = marker.transform.localScale;
-
-        while (marker != null)
-        {
-            float pulse = 1f + Mathf.Sin(Time.time * pulseSpeed) * pulseScaleAmount;
-            marker.transform.localScale = baseScale * pulse;
-            yield return null;
-        }
-    }
- 
-    private IEnumerator LifetimeAndFade(GameObject marker, float lifetime, float fadeTime)
-    {
-        // Wait full lifetime
-        yield return new WaitForSeconds(lifetime);
-
-        if (marker == null) yield break;
-
-        // Collect all renderers and lights for fading
-        var renderers = marker.GetComponentsInChildren<Renderer>();
-        var lights = marker.GetComponentsInChildren<Light>();
-        var labels = marker.GetComponentsInChildren<TextMeshPro>();
-
+        // Phase 1: Rise up from ground (0.4s)
+        float riseTime = 0.4f;
         float elapsed = 0f;
+        Vector3 startPos = root.transform.position;
+        Vector3 endPos = startPos + Vector3.up * riseHeight;
+        root.transform.localScale = Vector3.zero;
 
-        // Store original values
-        var originalColors = new Color[renderers.Length];
-        var originalIntensities = new float[lights.Length];
-        var originalLabelColors = new Color[labels.Length];
-
-        for (int i = 0; i < renderers.Length; i++)
-            originalColors[i] = renderers[i].material.color;
-
-        for (int i = 0; i < lights.Length; i++)
-            originalIntensities[i] = lights[i].intensity;
-
-        for (int i = 0; i < labels.Length; i++)
-            originalLabelColors[i] = labels[i].color;
-
-        // Fade out
-        while (elapsed < fadeTime && marker != null)
+        while (elapsed < riseTime)
         {
             elapsed += Time.deltaTime;
-            float t = elapsed / fadeTime;  // 0 → 1
+            float t = elapsed / riseTime;
+            float ease = 1f - Mathf.Pow(1f - t, 3f);  // ease out cubic
 
-            // Fade renderers
-            for (int i = 0; i < renderers.Length; i++)
-            {
-                if (renderers[i] == null) continue;
-                Color c = originalColors[i];
-                renderers[i].material.color = new Color(c.r, c.g, c.b, Mathf.Lerp(c.a, 0f, t));
-            }
+            root.transform.position = Vector3.Lerp(startPos, endPos, ease);
+            root.transform.localScale = Vector3.Lerp(Vector3.zero, Vector3.one, ease);
+            yield return null;
+        }
 
-            // Fade lights
-            for (int i = 0; i < lights.Length; i++)
-            {
-                if (lights[i] == null) continue;
-                lights[i].intensity = Mathf.Lerp(originalIntensities[i], 0f, t);
-            }
+        root.transform.position = endPos;
+        root.transform.localScale = Vector3.one;
 
-            // Fade labels
-            for (int i = 0; i < labels.Length; i++)
-            {
-                if (labels[i] == null) continue;
-                Color c = originalLabelColors[i];
-                labels[i].color = new Color(c.r, c.g, c.b, Mathf.Lerp(c.a, 0f, t));
-            }
+        // Phase 2: Pulse for lifetime
+        float aliveTime = 0f;
+        while (aliveTime < markerLifetime)
+        {
+            aliveTime += Time.deltaTime;
+
+            // Pulse scale
+            float pulse = 1f + Mathf.Sin(Time.time * pulseSpeed) * 0.12f;
+            root.transform.localScale = Vector3.one * pulse;
+
+            // Pulse light
+            if (glow != null)
+                glow.intensity = 3f + Mathf.Sin(Time.time * pulseSpeed * 1.5f) * 1.5f;
+
+            // Spin diamond
+            var diamond = root.transform.Find("Diamond");
+            if (diamond != null)
+                diamond.Rotate(0, 90f * Time.deltaTime, 0, Space.World);
 
             yield return null;
         }
 
-        // Destroy after fade
-        if (marker != null)
-            Destroy(marker);
+        // Phase 3: Fade out (1.5s)
+        float fadeTime = 1.5f;
+        float fadeElapsed = 0f;
+
+        var renderers = root.GetComponentsInChildren<Renderer>();
+
+        while (fadeElapsed < fadeTime && root != null)
+        {
+            fadeElapsed += Time.deltaTime;
+            float alpha = Mathf.Lerp(1f, 0f, fadeElapsed / fadeTime);
+
+            foreach (var r in renderers)
+            {
+                Color c = r.material.color;
+                r.material.color = new Color(c.r, c.g, c.b, alpha);
+            }
+
+            if (glow != null) glow.intensity = Mathf.Lerp(4f, 0f, fadeElapsed / fadeTime);
+            if (tmp != null) tmp.alpha = alpha;
+
+            yield return null;
+        }
+
+        if (root != null) Destroy(root);
     }
- 
-    private string FormatCrimeLabel(CrimeEventData evt)
+
+    private string BuildAlertText(CrimeEventData evt)
     {
-        string type = evt.type switch
+        string icon = evt.caught ? "✓" : "⚠";
+
+        string crimeType = evt.type switch
         {
             "theft" => "THEFT",
             "assault" => "ASSAULT",
-            "vandalism" => "VANDAL",
-            "burglary" => "BURGLAR",
+            "vandalism" => "VANDALISM",
+            "burglary" => "BURGLARY",
             _ => evt.type.ToUpper()
         };
 
-        return evt.caught ? $"✓ {type}" : type;
+        string status = evt.caught
+            ? "CRIMINAL CAUGHT"
+            : "CRIMINAL ESCAPED";
+
+        // Format time
+        int hour = Mathf.FloorToInt(evt.time_of_day);
+        int min = Mathf.FloorToInt((evt.time_of_day - hour) * 60);
+        string ampm = hour >= 12 ? "PM" : "AM";
+        int h12 = hour % 12 == 0 ? 12 : hour % 12;
+
+        return $"{icon} {crimeType}\nZone {evt.zone} — {h12}:{min:D2} {ampm}\n{status}";
     }
- 
-    public void ClearHistory()
+
+    private void SetMaterialColor(GameObject go, Color color)
     {
-        _spawnedIds.Clear();
+        var r = go.GetComponent<Renderer>();
+        var mat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+        mat.SetFloat("_Surface", 1);    // transparent
+        mat.SetFloat("_Blend", 0);    // alpha blend
+        mat.color = color;
+        r.material = mat;
     }
+
+    public void ClearHistory() => _spawnedIds.Clear();
 }

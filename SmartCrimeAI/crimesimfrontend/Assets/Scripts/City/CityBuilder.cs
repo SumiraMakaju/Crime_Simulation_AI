@@ -32,11 +32,15 @@ public class CityBuilder : MonoBehaviour
     private bool _built = false;
 
 
-    void Start()
+    //void Start()
+    //{
+    //    BuildCity();
+   // }
+
+    void Awake()
     {
         BuildCity();
     }
-
 
     public void BuildCity()
     {
@@ -127,7 +131,9 @@ public class CityBuilder : MonoBehaviour
         _built = true;
         IsReady = true;  // add this line
         Debug.Log($"[CityBuilder] Built {ZoneObjects.Count} zones successfully.");
+       
         BakeNavMesh();
+        Debug.Log($"[CityBuilder] Zone keys loaded: {string.Join(", ", ZoneConfigs.Keys)}");
     }
 
     private void BakeNavMesh()
