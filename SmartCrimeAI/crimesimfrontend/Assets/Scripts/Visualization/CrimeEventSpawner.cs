@@ -179,6 +179,8 @@ public class CrimeEventSpawner : MonoBehaviour
 
             foreach (var r in renderers)
             {
+                if (r.material.shader.name.Contains("TextMeshPro")) continue;
+                if (!r.material.HasProperty("_BaseColor") && !r.material.HasProperty("_Color")) continue;
                 Color c = r.material.color;
                 r.material.color = new Color(c.r, c.g, c.b, alpha);
             }
@@ -194,7 +196,7 @@ public class CrimeEventSpawner : MonoBehaviour
 
     private string BuildAlertText(CrimeEventData evt)
     {
-        string icon = evt.caught ? "✓" : "⚠";
+        string icon = evt.caught ? "[CAUGHT]" : "[CRIME]";
 
         string crimeType = evt.type switch
         {
@@ -205,17 +207,14 @@ public class CrimeEventSpawner : MonoBehaviour
             _ => evt.type.ToUpper()
         };
 
-        string status = evt.caught
-            ? "CRIMINAL CAUGHT"
-            : "CRIMINAL ESCAPED";
+        string status = evt.caught ? "CRIMINAL CAUGHT" : "CRIMINAL ESCAPED";
 
-        // Format time
         int hour = Mathf.FloorToInt(evt.time_of_day);
         int min = Mathf.FloorToInt((evt.time_of_day - hour) * 60);
         string ampm = hour >= 12 ? "PM" : "AM";
         int h12 = hour % 12 == 0 ? 12 : hour % 12;
 
-        return $"{icon} {crimeType}\nZone {evt.zone} — {h12}:{min:D2} {ampm}\n{status}";
+        return $"{icon} {crimeType}\nZone {evt.zone} - {h12}:{min:D2} {ampm}\n{status}";
     }
 
     private void SetMaterialColor(GameObject go, Color color)

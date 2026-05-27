@@ -14,17 +14,17 @@ OcclusionCullingSettings:
 RenderSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 10
-  m_Fog: 0
-  m_FogColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
-  m_FogMode: 3
-  m_FogDensity: 0.01
+  m_Fog: 1
+  m_FogColor: {r: 0.039215688, g: 0.05882353, b: 0.101960786, a: 1}
+  m_FogMode: 2
+  m_FogDensity: 0.005
   m_LinearFogStart: 0
   m_LinearFogEnd: 300
   m_AmbientSkyColor: {r: 0.212, g: 0.227, b: 0.259, a: 1}
   m_AmbientEquatorColor: {r: 0.114, g: 0.125, b: 0.133, a: 1}
   m_AmbientGroundColor: {r: 0.047, g: 0.043, b: 0.035, a: 1}
   m_AmbientIntensity: 1
-  m_AmbientMode: 0
+  m_AmbientMode: 3
   m_SubtractiveShadowColor: {r: 0.101960786, g: 0.1254902, b: 0.20784314, a: 1}
   m_SkyboxMaterial: {fileID: 10304, guid: 0000000000000000f000000000000000, type: 0}
   m_HaloStrength: 0.5
@@ -266,7 +266,7 @@ Camera:
   m_Enabled: 1
   serializedVersion: 2
   m_ClearFlags: 2
-  m_BackGroundColor: {r: 0.101960786, g: 0.101960786, b: 0.101960786, a: 0}
+  m_BackGroundColor: {r: 0.101960786, g: 0.101960786, b: 0.18039216, a: 0}
   m_projectionMatrixMode: 1
   m_GateFitMode: 2
   m_FOVAxisMode: 0
@@ -289,7 +289,7 @@ Camera:
     height: 1
   near clip plane: 0.3
   far clip plane: 500
-  field of view: 20
+  field of view: 60
   orthographic: 0
   orthographic size: 5
   m_Depth: -1
@@ -345,7 +345,7 @@ MonoBehaviour:
     m_Bits: 1
   m_VolumeTrigger: {fileID: 0}
   m_VolumeFrameworkUpdateModeOption: 2
-  m_RenderPostProcessing: 1
+  m_RenderPostProcessing: 0
   m_Antialiasing: 0
   m_AntialiasingQuality: 2
   m_StopNaN: 0
@@ -514,11 +514,76 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 410087039}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 65e91398c15e2054c885ddedc615912e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DayNightController
+  sunLight: {fileID: 410087040}
+  sunIntensityCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 0.25
+      value: 0.8
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 0.5
+      value: 1.5
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 0.75
+      value: 0.6
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  colorNight: {r: 0.05, g: 0.05, b: 0.15, a: 1}
+  colorSunrise: {r: 1, g: 0.5, b: 0.2, a: 1}
+  colorNoon: {r: 1, g: 0.95, b: 0.85, a: 1}
+  colorSunset: {r: 1, g: 0.4, b: 0.15, a: 1}
+  colorDusk: {r: 0.2, g: 0.1, b: 0.3, a: 1}
+  ambientNight: {r: 0.02, g: 0.02, b: 0.06, a: 1}
+  ambientDay: {r: 0.25, g: 0.28, b: 0.35, a: 1}
+  controlFog: 0
+  fogColorDay: {r: 0.6, g: 0.7, b: 0.8, a: 1}
+  fogColorNight: {r: 0.01, g: 0.01, b: 0.04, a: 1}
+  fogDensityDay: 0.001
+  fogDensityNight: 0.004
+  transitionSpeed: 1.5
 --- !u!1 &489754753
 GameObject:
   m_ObjectHideFlags: 0
@@ -827,12 +892,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a12d715e56c1b3040bbb2a23f228ec47, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CrimeEventSpawner
-  crimeMarkerPrefab: {fileID: 0}
-  interceptMarkerPrefab: {fileID: 0}
   markerLifetime: 10
-  fadeDuration: 3
+  riseHeight: 4
   pulseSpeed: 3
-  pulseScaleAmount: 0.15
 --- !u!114 &844574067
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -966,12 +1028,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a12d715e56c1b3040bbb2a23f228ec47, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CrimeEventSpawner
-  crimeMarkerPrefab: {fileID: 1842553312398696417, guid: 63d64f1c317d3c0458b196465a371488, type: 3}
-  interceptMarkerPrefab: {fileID: 1772616226415181045, guid: 5c8a35adb939d284bb1ed1d62b046cd6, type: 3}
   markerLifetime: 10
-  fadeDuration: 3
+  riseHeight: 4
   pulseSpeed: 3
-  pulseScaleAmount: 0.15
 --- !u!1 &1016084432
 GameObject:
   m_ObjectHideFlags: 0

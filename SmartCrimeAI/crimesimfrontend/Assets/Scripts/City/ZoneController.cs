@@ -26,19 +26,16 @@ public class ZoneController : MonoBehaviour
 
 
     void Awake()
-    {
-        var heatPlane = transform.Find("HeatmapPlane");
-        if (heatPlane != null)
-        {
-            _heatmapRenderer = heatPlane.GetComponent<Renderer>();
-            // Set starting color to fully transparent
-            _heatmapRenderer.material.color = new Color(0, 0, 0, 0);
-        }
+{
+    // Color the ground instead of a separate plane
+    var ground = transform.Find("Ground");
+    if (ground != null)
+        _heatmapRenderer = ground.GetComponent<Renderer>();
 
-        _streetLight = GetComponentInChildren<Light>();
-        _targetColor = ColorGreen;
-        _targetLightIntensity = 1.5f;
-    }
+    _streetLight = GetComponentInChildren<Light>();
+    _targetColor = new Color(0.12f, 0.16f, 0.22f); // default dark ground
+    _targetLightIntensity = 1.5f;
+}
 
     // 
     void Update()

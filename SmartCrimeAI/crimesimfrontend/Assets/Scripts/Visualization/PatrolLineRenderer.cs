@@ -139,6 +139,7 @@ public class PatrolLineRenderer : MonoBehaviour
         lr.numCapVertices = 4;   // smooth ends
         lr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         lr.receiveShadows = false;
+        lr.material.color = color;
 
         _lineRenderers[policeId] = lr;
     }
