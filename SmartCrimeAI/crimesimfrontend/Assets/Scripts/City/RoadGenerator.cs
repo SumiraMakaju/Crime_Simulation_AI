@@ -6,7 +6,9 @@ public class RoadGenerator : MonoBehaviour
     public Material roadMaterial;
     public float roadWidth = 1.5f;
     public float roadHeight = 0.05f;  // just above ground
+    public GameObject streetLampPrefab; // assign in Inspector
 
+   
     private CityBuilder _cityBuilder;
 
  
@@ -66,6 +68,8 @@ public class RoadGenerator : MonoBehaviour
 
         GenerateCenterLines(rows, cols, zoneSize);
 
+        PlaceStreetLamps(rows, cols, zoneSize);
+
         Debug.Log("[RoadGenerator] Roads generated.");
     }
 
@@ -109,7 +113,24 @@ public class RoadGenerator : MonoBehaviour
             }
         }
     }
-     
+    private void PlaceStreetLamps(int rows, int cols, int zoneSize)
+    {
+        if (streetLampPrefab == null) return;
+
+        // Place a lamp at every zone corner
+        for (int r = 0; r <= rows; r++)
+        {
+            for (int c = 0; c <= cols; c++)
+            {
+                Vector3 pos = new Vector3(
+                    c * zoneSize, 0f, r * zoneSize);
+
+                Instantiate(streetLampPrefab, pos,
+                    Quaternion.identity, transform);
+            }
+        }
+    }
+
     private void AssignRoadMaterial(GameObject road)
     {
         var r = road.GetComponent<Renderer>();

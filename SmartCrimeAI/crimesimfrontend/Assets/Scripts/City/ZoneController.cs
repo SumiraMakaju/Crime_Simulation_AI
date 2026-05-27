@@ -26,19 +26,30 @@ public class ZoneController : MonoBehaviour
 
 
     void Awake()
-{
-    // Color the ground instead of a separate plane
-    var ground = transform.Find("Ground");
-    if (ground != null)
-        _heatmapRenderer = ground.GetComponent<Renderer>();
+    {
+        var ground = transform.Find("Ground");
+        if (ground != null)
+            _heatmapRenderer = ground.GetComponent<Renderer>();
 
-    _streetLight = GetComponentInChildren<Light>();
-        _targetColor = new Color(0.12f, 0.16f, 0.22f); // dark default
+        _streetLight = GetComponentInChildren<Light>();
+
+        // Set default ground color per zone type
+        Color groundColor = ZoneType switch
+        {
+            "residential" => new Color(0.12f, 0.16f, 0.22f),
+            "commercial" => new Color(0.10f, 0.10f, 0.18f),
+            "park" => new Color(0.08f, 0.18f, 0.10f),
+            "intersection" => new Color(0.10f, 0.10f, 0.10f),
+            _ => new Color(0.12f, 0.12f, 0.15f)
+        };
+
+        _targetColor = groundColor;
+
         if (_heatmapRenderer != null)
-            _heatmapRenderer.material.color = new Color(0.12f, 0.16f, 0.22f);
-        _targetLightIntensity = 1.5f;
-}
+            _heatmapRenderer.material.color = groundColor;
 
+        _targetLightIntensity = 0.5f;
+    }
     // 
     void Update()
     {
@@ -65,16 +76,25 @@ public class ZoneController : MonoBehaviour
     /// <summary>Called every tick by SimulationManager with fresh /state data</summary>
     public void UpdateFromApi(ZoneData data)
     {
-        // Map risk_score to heatmap color
-        _targetColor = data.risk_score switch
+        // Blend base zone color with risk color
+        Color baseColor = ZoneType switch
         {
-            < 0.3f => ColorGreen,
-            < 0.6f => ColorYellow,
-            < 0.8f => ColorOrange,
-            _ => ColorRed
+            "residential" => new Color(0.12f, 0.16f, 0.22f),
+            "commercial" => new Color(0.10f, 0.10f, 0.18f),
+            "park" => new Color(0.08f, 0.18f, 0.10f),
+            "intersection" => new Color(0.10f, 0.10f, 0.10f),
+            _ => new Color(0.12f, 0.12f, 0.15f)
         };
 
-        // Drive street light from lighting value (0.0–1.0 → 0.0–3.0 Unity intensity)
-        _targetLightIntensity = data.lighting * 3f;
+        Color riskColor = data.risk_score switch
+        {
+            < 0.3f => baseColor,
+            < 0.6f => Color.Lerp(baseColor, new Color(0.4f, 0.3f, 0.0f), 0.4f),
+            < 0.8f => Color.Lerp(baseColor, new Color(0.5f, 0.15f, 0.0f), 0.6f),
+            _ => Color.Lerp(baseColor, new Color(0.5f, 0.0f, 0.0f), 0.8f)
+        };
+
+        _targetColor = riskColor;
+        _targetLightIntensity = data.lighting * 0.8f;
     }
 }
