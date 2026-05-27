@@ -33,8 +33,10 @@ public class ZoneController : MonoBehaviour
         _heatmapRenderer = ground.GetComponent<Renderer>();
 
     _streetLight = GetComponentInChildren<Light>();
-    _targetColor = new Color(0.12f, 0.16f, 0.22f); // default dark ground
-    _targetLightIntensity = 1.5f;
+        _targetColor = new Color(0.12f, 0.16f, 0.22f); // dark default
+        if (_heatmapRenderer != null)
+            _heatmapRenderer.material.color = new Color(0.12f, 0.16f, 0.22f);
+        _targetLightIntensity = 1.5f;
 }
 
     // 

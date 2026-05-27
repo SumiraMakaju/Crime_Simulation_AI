@@ -132,6 +132,13 @@ public class SimulationManager : MonoBehaviour
         if (patrolLineRenderer != null && state.patrol_routes != null)
             patrolLineRenderer.UpdateRoutes(state.patrol_routes);
 
+        // Feed crime events to dashboard log
+        if (dashboardController != null)
+        {
+            foreach (var evt in state.crime_events)
+                dashboardController.AddCrimeLogEntry(evt);
+        }
+
         _lastTick = state.tick;
     }
  
@@ -164,23 +171,20 @@ public class SimulationManager : MonoBehaviour
             );
         }
     }
-     
+
     // Public scenario controls — called by UI buttons
- 
-    public void SetPatrolModeGreedy() => apiClient.SetPatrolMode("greedy");
-    public void SetPatrolModeAI() => apiClient.SetPatrolMode("ai");
-    public void SetPatrolModeRandom() => apiClient.SetPatrolMode("random");
 
-    public void AddOnePolice() => apiClient.AddPolice(1);
-    public void RemoveOnePolice() => apiClient.RemovePolice(1);
+    public void SetPatrolModeGreedy() { if (apiClient) apiClient.SetPatrolMode("greedy"); }
+    public void SetPatrolModeAI() { if (apiClient) apiClient.SetPatrolMode("ai"); }
+    public void SetPatrolModeRandom() { if (apiClient) apiClient.SetPatrolMode("random"); }
+    public void AddOnePolice() { if (apiClient) apiClient.AddPolice(1); }
+    public void RemoveOnePolice() { if (apiClient) apiClient.RemovePolice(1); }
+    public void SetLightingDay() { if (apiClient) apiClient.SetLightingAll(1.0f); }
+    public void SetLightingNight() { if (apiClient) apiClient.SetLightingAll(0.2f); }
+    public void JumpToNoon() { if (apiClient) apiClient.JumpToHour(12f); }
+    public void JumpToMidnight() { if (apiClient) apiClient.JumpToHour(0f); }
+    public void ResetMetrics() { if (apiClient) apiClient.ResetMetrics(); }
 
-    public void SetLightingDay() => apiClient.SetLightingAll(1.0f);
-    public void SetLightingNight() => apiClient.SetLightingAll(0.2f);
-
-    public void JumpToNoon() => apiClient.JumpToHour(12f);
-    public void JumpToMidnight() => apiClient.JumpToHour(0f);
-
-    public void ResetMetrics() => apiClient.ResetMetrics();
 
    
     // Helpers

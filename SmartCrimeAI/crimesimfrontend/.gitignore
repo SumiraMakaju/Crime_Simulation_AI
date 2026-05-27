@@ -133,3 +133,6 @@ SmartCrimeAI/backend/shared/zone_config.json
 .vscode/
 .pytest_cache/
 .ipynb_checkpoints/
+
+SmartCrimeAI/crimesimfrontend/Assets/_Recovery.meta
+SmartCrimeAI/crimesimfrontend/Assets/_Recovery/
