@@ -132,13 +132,15 @@ public class SimulationManager : MonoBehaviour
         if (patrolLineRenderer != null && state.patrol_routes != null)
             patrolLineRenderer.UpdateRoutes(state.patrol_routes);
 
-        // Feed crime events to dashboard log
-        if (dashboardController != null)
+        
+        if (dashboardController != null && state.tick != _lastTick)
         {
             foreach (var evt in state.crime_events)
                 dashboardController.AddCrimeLogEntry(evt);
         }
 
+         
+        if (state.tick == _lastTick) return; // skip duplicate ticks 
         _lastTick = state.tick;
     }
  

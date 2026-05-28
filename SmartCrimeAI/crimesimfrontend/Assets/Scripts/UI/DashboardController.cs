@@ -174,45 +174,48 @@ public class DashboardController : MonoBehaviour
         if (logContent == null || _loggedIds.Contains(evt.id)) return;
         _loggedIds.Add(evt.id);
 
-        // Trim old entries
+        // Trim old entries safely using DestroyImmediate alternative
         while (logContent.childCount >= _maxLogEntries)
-            Destroy(logContent.GetChild(0).gameObject);
-
-        // Create entry
-        GameObject entry;
-        if (logEntryPrefab != null)
         {
-            entry = Instantiate(logEntryPrefab, logContent);
-        }
-        else
-        {
-            // Build from scratch if no prefab assigned
-            entry = new GameObject("LogEntry");
-            entry.transform.SetParent(logContent);
-            entry.AddComponent<TextMeshProUGUI>();
+            var oldest = logContent.GetChild(0).gameObject;
+            oldest.transform.SetParent(null); // detach first
+            Destroy(oldest);                  // then destroy
         }
 
-        var tmp = entry.GetComponent<TextMeshProUGUI>();
-        if (tmp == null) tmp = entry.GetComponentInChildren<TextMeshProUGUI>();
-        if (tmp == null) return;
+        // Build entry from scratch — no prefab needed
+        var entry = new GameObject("LogEntry");
+        entry.transform.SetParent(logContent, false);
 
-        // Format entry
+        // Add LayoutElement so VLG sizes it correctly
+        var le = entry.AddComponent<UnityEngine.UI.LayoutElement>();
+        le.preferredHeight = 22;
+        le.flexibleWidth = 1;
+
+        // Add RectTransform sizing
+        var rect = entry.GetComponent<RectTransform>();
+        rect.sizeDelta = new Vector2(0, 22);
+
+        // Add TMP text
+        var tmp = entry.AddComponent<TextMeshProUGUI>();
+
         int hour = Mathf.FloorToInt(evt.time_of_day);
         int min = Mathf.FloorToInt((evt.time_of_day - hour) * 60);
         string ampm = hour >= 12 ? "PM" : "AM";
         int h12 = hour % 12 == 0 ? 12 : hour % 12;
-
         string status = evt.caught ? "CAUGHT" : "ESCAPED";
-        tmp.text = $"{h12}:{min:D2} {ampm} | {evt.type.ToUpper()} | {evt.zone} | {status}";
+
+        tmp.text = $"{h12}:{min:D2} {ampm}  {evt.type.ToUpper()}  {evt.zone}  {status}";
         tmp.fontSize = 11;
         tmp.color = evt.caught
-            ? new Color(0.3f, 1.0f, 0.5f)   // green
-            : new Color(1.0f, 0.3f, 0.3f);  // red
+            ? new Color(0.3f, 1.0f, 0.5f)
+            : new Color(1.0f, 0.3f, 0.3f);
+        tmp.fontStyle = FontStyles.Bold;
 
         // Scroll to bottom
-        var scrollRect = logContent.GetComponentInParent<ScrollRect>();
+        var scrollRect = logContent.GetComponentInParent<UnityEngine.UI.ScrollRect>();
         if (scrollRect != null)
-            scrollRect.verticalNormalizedPosition = 0f;
+            Canvas.ForceUpdateCanvases();
+        scrollRect.verticalNormalizedPosition = 0f;
     }
 
     private void StyleButton(Button btn, Color color)
