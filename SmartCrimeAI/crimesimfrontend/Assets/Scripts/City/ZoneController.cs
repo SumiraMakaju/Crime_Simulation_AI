@@ -75,7 +75,9 @@ public class ZoneController : MonoBehaviour
     // 
     /// <summary>Called every tick by SimulationManager with fresh /state data</summary>
     public void UpdateFromApi(ZoneData data)
+
     {
+        Debug.Log($"[Zone {ZoneId}] risk={data.risk_score:F2}");
         // Blend base zone color with risk color
         Color baseColor = ZoneType switch
         {

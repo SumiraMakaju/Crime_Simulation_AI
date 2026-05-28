@@ -3692,6 +3692,7 @@ MonoBehaviour:
   roadMaterial: {fileID: 0}
   roadWidth: 1.5
   roadHeight: 0.05
+  streetLampPrefab: {fileID: 0}
 --- !u!1 &1124634194
 GameObject:
   m_ObjectHideFlags: 0
@@ -5548,6 +5549,7 @@ GameObject:
   - component: {fileID: 2094159325}
   - component: {fileID: 2094159324}
   - component: {fileID: 2094159323}
+  - component: {fileID: 2094159327}
   m_Layer: 5
   m_Name: UI Canvas
   m_TagString: Untagged
@@ -5639,6 +5641,18 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0, y: 0}
+--- !u!114 &2094159327
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2094159322}
+  m_Enabled: 0
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e5aa4734c1dfa5e4e8fed474b24ae837, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::UIStyler
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
