@@ -47,6 +47,7 @@ class Zone:
     row: int = 0
     col: int = 0
     base_lighting: float = 1.0                         # original lighting before night reduction
+    default_lighting: float = 1.0                      # original healthy lighting (never overridden by scenario blackouts)
     hidden_crime_attractor: float = 0.0                # dynamic latent factor unobserved by ML
 
 
@@ -89,6 +90,7 @@ class CityEnvironment:
                     zone_type=chosen_type,
                     lighting=base_light,
                     base_lighting=base_light,
+                    default_lighting=base_light,
                     row=r,
                     col=c,
                     hidden_crime_attractor=hidden_attractor,
@@ -186,17 +188,19 @@ class CityEnvironment:
         """
         Apply or remove the night-time lighting penalty.
 
-        During night hours, zones whose type is in DARK_ZONE_TYPES have their
-        lighting reduced.  During the day the lighting is restored to
-        base_lighting.
+        During daytime, all zones are illuminated by the sun (restored to default_lighting).
+        During night hours, zones use base_lighting (which can be overridden by a blackout scenario),
+        and zones in DARK_ZONE_TYPES have additional night reduction.
         """
         night = self._is_night()
         for zone in self.zones.values():
-            if zone.zone_type in DARK_ZONE_TYPES:
-                if night:
+            if night:
+                if zone.zone_type in DARK_ZONE_TYPES:
                     zone.lighting = zone.base_lighting * (1.0 - NIGHT_LIGHTING_REDUCTION)
                 else:
                     zone.lighting = zone.base_lighting
+            else:
+                zone.lighting = zone.default_lighting
             # Update hotspot flag while iterating
             zone.is_hotspot = zone.risk_score > HOTSPOT_RISK_THRESHOLD
 

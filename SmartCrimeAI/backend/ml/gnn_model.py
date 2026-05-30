@@ -219,7 +219,7 @@ class GNNTrainer:
                 
         y_true = np.array(all_true)
         y_proba = np.array(all_proba)
-        y_pred = (y_proba > 0.3).astype(int)
+        y_pred = (y_proba > 0.1).astype(int)
         
         # Compute metrics
         try:

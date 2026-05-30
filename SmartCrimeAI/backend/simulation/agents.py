@@ -273,6 +273,8 @@ class CriminalAgent:
         # ── 1. Laying low ────────────────────────────────────────────────
         if self.lay_low_timer > 0:
             self.lay_low_timer -= 1
+            if self.lay_low_timer == 0:
+                self.hot_zones.clear()  # Heat has died down, forget hot zones to prevent permanent gridlock
             self.state = "laying_low"
             return None
 

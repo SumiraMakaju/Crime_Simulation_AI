@@ -285,7 +285,7 @@ def main() -> None:  # noqa: C901 — intentionally monolithic orchestrator
 
                 # Synchronize metric_logger with all caught events in crime_log
                 # This ensures both immediate catches AND responded catches (after travel) are counted!
-                caught_events = [e for e in crime_log.events if e.caught]
+                caught_events = [e for e in crime_log.events if e.caught and e.tick >= metric_logger.reset_tick]
                 if len(caught_events) > metric_logger.total_caught:
                     metric_logger.total_caught = len(caught_events)
                     metric_logger.response_times = [
