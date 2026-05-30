@@ -62,6 +62,7 @@ class ScenarioEngine:
         self.metric_logger = metric_logger
         self.log: List[dict] = []
         self.patrol_mode: str = "greedy"
+        self.active_scenario: str = "normal"
 
     # ------------------------------------------------------------------ #
     #  Public API
@@ -81,6 +82,10 @@ class ScenarioEngine:
             ``{"status": "applied", "tick": int, "changes": list}``
         """
         changes: List[str] = []
+
+        if "active_scenario" in config:
+            self.active_scenario = str(config["active_scenario"])
+            changes.append(f"active scenario -> {self.active_scenario}")
 
         if "add_police" in config:
             n = int(config["add_police"])

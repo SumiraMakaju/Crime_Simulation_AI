@@ -72,6 +72,7 @@ class SimulationState:
         return {
             "tick": _to_native(env.tick),
             "time_of_day": _to_native(env.time_of_day),
+            "active_scenario": str(getattr(self.scenario_engine, "active_scenario", "normal")),
             "agents": agents,
             "zones": zones,
             "patrol_routes": {
@@ -254,6 +255,7 @@ def create_app(sim_state: SimulationState) -> FastAPI:
             return {
                 "tick": _to_native(env.tick),
                 "time_of_day": _to_native(env.time_of_day),
+                "active_scenario": str(getattr(sim_state.scenario_engine, "active_scenario", "normal")),
                 "agents": agents,
                 "zones": zones,
                 "patrol_routes": {
@@ -365,6 +367,62 @@ def create_app(sim_state: SimulationState) -> FastAPI:
                 result = sim_state.scenario_engine.apply(body)
                 return {"status": "ok", "result": result}
             except Exception as exc:  # noqa: BLE001
+                return {"status": "error", "detail": str(exc)}
+
+    # ── POST /scenario/blackout ──────────────────────────────────────────
+    @app.post("/scenario/blackout")
+    def trigger_blackout() -> Dict[str, Any]:
+        """Trigger the Midnight Grid Failure (Blackout) macro scenario."""
+        with sim_state.lock:
+            if sim_state.scenario_engine is None:
+                return {"status": "error", "detail": "scenario engine not initialised"}
+            try:
+                body = {
+                    "active_scenario": "blackout",
+                    "time_jump": 22.0,
+                    "set_lighting": { "all": 0.05 },
+                    "set_patrol_mode": "greedy"
+                }
+                result = sim_state.scenario_engine.apply(body)
+                return {"status": "ok", "result": result}
+            except Exception as exc:
+                return {"status": "error", "detail": str(exc)}
+
+    # ── POST /scenario/saturation ────────────────────────────────────────
+    @app.post("/scenario/saturation")
+    def trigger_saturation() -> Dict[str, Any]:
+        """Trigger the Emergency Night Coordinated Dispatch macro scenario."""
+        with sim_state.lock:
+            if sim_state.scenario_engine is None:
+                return {"status": "error", "detail": "scenario engine not initialised"}
+            try:
+                body = {
+                    "active_scenario": "saturation",
+                    "add_police": 5,
+                    "set_patrol_mode": "marl"
+                }
+                result = sim_state.scenario_engine.apply(body)
+                return {"status": "ok", "result": result}
+            except Exception as exc:
+                return {"status": "error", "detail": str(exc)}
+
+    # ── POST /scenario/recovery ──────────────────────────────────────────
+    @app.post("/scenario/recovery")
+    def trigger_recovery() -> Dict[str, Any]:
+        """Trigger the Restore Sunny Morning Order macro scenario."""
+        with sim_state.lock:
+            if sim_state.scenario_engine is None:
+                return {"status": "error", "detail": "scenario engine not initialised"}
+            try:
+                body = {
+                    "active_scenario": "normal",
+                    "time_jump": 8.0,
+                    "set_lighting": { "all": 1.0 },
+                    "remove_police": 5
+                }
+                result = sim_state.scenario_engine.apply(body)
+                return {"status": "ok", "result": result}
+            except Exception as exc:
                 return {"status": "error", "detail": str(exc)}
 
     # ── GET / (HTML Dashboard) ──────────────────────────────────────────
@@ -861,6 +919,10 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         <div class="tel-lbl">Patrol Mode</div>
         <div id="patrol-mode-badge" class="tel-val" style="color:var(--accent-purple)">Greedy</div>
       </div>
+      <div class="tel-item">
+        <div class="tel-lbl">Active Scenario</div>
+        <div id="active-scenario-badge" class="tel-val" style="color:var(--accent-green)">Normal</div>
+      </div>
     </div>
   </header>
 
@@ -927,6 +989,22 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             <button onclick="spawnCivilians(5)">🚶 Spawn Civilians (+5)</button>
           </div>
           <button onclick="resetMetrics()" class="danger" style="margin-top:0.5rem">🔄 Reset Statistics</button>
+        </div>
+      </div>
+
+      <!-- Macro Stress Tests Card -->
+      <div class="glass-card" style="margin-top: 1.5rem;">
+        <div class="card-title">Realistic Macro Stress Tests</div>
+        <div class="controls-panel" style="display: flex; flex-direction: column; gap: 0.75rem;">
+          <button onclick="triggerMacroScenario('blackout')" class="danger" style="justify-content: flex-start; text-align: left; padding: 0.8rem 1.2rem; font-weight: 600;">
+            🌑 1. Midnight Grid Failure (Blackout)
+          </button>
+          <button onclick="triggerMacroScenario('saturation')" class="primary" style="justify-content: flex-start; text-align: left; padding: 0.8rem 1.2rem; font-weight: 600; background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple)); border: none; box-shadow: 0 4px 10px rgba(59, 130, 246, 0.2);">
+            🚨 2. Emergency Night Coordinated Dispatch
+          </button>
+          <button onclick="triggerMacroScenario('recovery')" style="justify-content: flex-start; text-align: left; padding: 0.8rem 1.2rem; font-weight: 600;">
+            ☀️ 3. Restore Sunny Morning Order
+          </button>
         </div>
       </div>
 
@@ -1009,6 +1087,22 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       const displayHours = hours % 12 === 0 ? 12 : hours % 12;
       const displayMins = mins < 10 ? '0' + mins : mins;
       document.getElementById('sim-time').innerText = `${displayHours}:${displayMins} ${ampm}`;
+
+      // Format active scenario name
+      const scenario = state.active_scenario || 'normal';
+      const scenarioBadge = document.getElementById('active-scenario-badge');
+      if (scenarioBadge) {
+        if (scenario === 'blackout') {
+          scenarioBadge.innerText = 'GRID FAILURE';
+          scenarioBadge.style.color = 'var(--accent-red)';
+        } else if (scenario === 'saturation') {
+          scenarioBadge.innerText = 'EMERGENCY DISPATCH';
+          scenarioBadge.style.color = 'var(--accent-orange)';
+        } else {
+          scenarioBadge.innerText = 'NORMAL';
+          scenarioBadge.style.color = 'var(--accent-green)';
+        }
+      }
 
       // --- 2. Update Grid Cells ---
       const zonesMap = {};
@@ -1261,6 +1355,14 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ reset_metrics: true })
+      });
+      pollTelemetry();
+      pollStateFallback();
+    }
+
+    async function triggerMacroScenario(scenarioType) {
+      await fetch(`/scenario/${scenarioType}`, {
+        method: 'POST'
       });
       pollTelemetry();
       pollStateFallback();
