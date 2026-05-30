@@ -47,6 +47,7 @@ class Zone:
     row: int = 0
     col: int = 0
     base_lighting: float = 1.0                         # original lighting before night reduction
+    hidden_crime_attractor: float = 0.0                # dynamic latent factor unobserved by ML
 
 
 class CityEnvironment:
@@ -82,6 +83,7 @@ class CityEnvironment:
                 zone_id = self._rc_to_id(r, c)
                 chosen_type = random.choices(zone_types, weights=zone_weights, k=1)[0]
                 base_light = round(random.uniform(0.6, 1.0), 2)
+                hidden_attractor = round(random.uniform(0.0, 0.35), 3)
                 zone = Zone(
                     zone_id=zone_id,
                     zone_type=chosen_type,
@@ -89,6 +91,7 @@ class CityEnvironment:
                     base_lighting=base_light,
                     row=r,
                     col=c,
+                    hidden_crime_attractor=hidden_attractor,
                 )
                 self.zones[zone_id] = zone
                 self.zone_ids.append(zone_id)

@@ -92,8 +92,13 @@ class CrimeLog:
             "assigned": False,
         })
 
-        # Positive row
-        self._write_csv_row(event, environment, crime_occurred=1)
+        # Positive row with 75% reporting rate (unreported crimes act as false zeros in training)
+        reporting_rate = 0.75
+        if random.random() < reporting_rate:
+            self._write_csv_row(event, environment, crime_occurred=1)
+        else:
+            # Unreported crime: recorded as a false negative (crime_occurred=0) in official ML logs
+            self._write_negative_row(event.zone_id, environment)
 
         # Two negative-sample rows from random zones that had no crime this tick
         other_zones = [
