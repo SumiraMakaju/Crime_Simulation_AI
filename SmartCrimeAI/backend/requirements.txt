@@ -6,3 +6,4 @@ gymnasium
 pandas
 numpy
 joblib
+matplotlib

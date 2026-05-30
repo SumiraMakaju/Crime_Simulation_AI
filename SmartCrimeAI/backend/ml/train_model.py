@@ -36,6 +36,8 @@ class ModelTrainer:
         self.is_trained: bool = False
         self.last_train_size: int = 0
         self.eval_metrics: dict = {}
+        self.X_test = None
+        self.y_test = None
 
     # ------------------------------------------------------------------ #
     #  Training                                                            #
@@ -65,7 +67,18 @@ class ModelTrainer:
         self.eval_metrics = self.evaluate(X_test, y_test)
         self.is_trained = True
         self.last_train_size = len(X)
+        self.X_test = X_test
+        self.y_test = y_test
         return self.eval_metrics
+
+    def get_feature_importances(self) -> tuple[list[str], list[float]]:
+        """Returns feature names and their relative importances."""
+        if not self.is_trained:
+            return [], []
+        importances = self.classifier.feature_importances_
+        from ml.dataset import FeatureExtractor
+        names = FeatureExtractor.feature_columns()
+        return names, list(importances)
 
     # ------------------------------------------------------------------ #
     #  Evaluation                                                          #
@@ -127,8 +140,8 @@ class ModelTrainer:
 
         joblib.dump(self.classifier, clf_path)
         joblib.dump(self.regressor, reg_path)
-        print(f"[ModelTrainer] Classifier saved → {clf_path}")
-        print(f"[ModelTrainer] Regressor  saved → {reg_path}")
+        print(f"[ModelTrainer] Classifier saved -> {clf_path}")
+        print(f"[ModelTrainer] Regressor  saved -> {reg_path}")
 
     def load(self, path: str | None = None) -> bool:
         """Load previously-saved models from disk.

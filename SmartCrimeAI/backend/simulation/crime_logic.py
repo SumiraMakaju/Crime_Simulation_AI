@@ -213,6 +213,7 @@ class MetricLogger:
             "ai": {"crimes": 0, "caught": 0},
             "random": {"crimes": 0, "caught": 0},
             "greedy": {"crimes": 0, "caught": 0},
+            "marl": {"crimes": 0, "caught": 0},
         }
         self.patrol_ticks_in_risk_zones: int = 0
         self.patrol_total_ticks: int = 0

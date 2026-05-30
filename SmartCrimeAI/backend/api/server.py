@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import threading
+import asyncio
 from typing import Any, Dict, List, Optional
 
 import numpy as np
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Query, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -32,8 +34,80 @@ class SimulationState:
         self.scenario_engine: Any = None
         self.patrol_routes: Dict[str, List[str]] = {}
         self.predictor: Any = None
+        self.gnn_trainer: Any = None
+        self.marl_coordinator: Any = None
 
         self.lock = threading.Lock()
+        self.ws_clients: List[WebSocket] = []
+        self.loop = None
+
+    def get_state_snapshot(self) -> Dict[str, Any]:
+        """Serializes current environment and agents safely to a dictionary."""
+        env = self.environment
+        if env is None:
+            return {}
+
+        # Agents
+        agents: List[Dict[str, Any]] = []
+        for civ in self.civilians:
+            agents.append(_agent_dict(civ, "civilian"))
+        for crim in self.criminals:
+            agents.append(_agent_dict(crim, "criminal"))
+        for pol in self.police:
+            agents.append(_agent_dict(pol, "police"))
+
+        # Zones
+        zones: List[Dict[str, Any]] = []
+        for zid in env.zone_ids:
+            zone = env.get_zone(zid)
+            zones.append(_zone_dict(zone))
+
+        # Crime events (most recent 10)
+        crime_events: List[Dict[str, Any]] = []
+        if self.crime_log is not None:
+            recent = self.crime_log.get_recent(10)
+            for ev in recent:
+                crime_events.append(_crime_event_dict(ev))
+
+        return {
+            "tick": _to_native(env.tick),
+            "time_of_day": _to_native(env.time_of_day),
+            "agents": agents,
+            "zones": zones,
+            "patrol_routes": {
+                str(k): [str(z) for z in v]
+                for k, v in self.patrol_routes.items()
+            },
+            "crime_events": crime_events,
+        }
+
+    def broadcast_state(self) -> None:
+        """Broadcasts simulation snapshot to all connected WebSocket clients thread-safely."""
+        if not self.ws_clients:
+            return
+
+        state_data = self.get_state_snapshot()
+        if not state_data:
+            return
+
+        async def _broadcast():
+            disconnected = []
+            for ws in list(self.ws_clients):
+                try:
+                    await ws.send_json(state_data)
+                except Exception:
+                    disconnected.append(ws)
+            for ws in disconnected:
+                if ws in self.ws_clients:
+                    self.ws_clients.remove(ws)
+
+        if self.loop and self.loop.is_running():
+            asyncio.run_coroutine_threadsafe(_broadcast(), self.loop)
+        else:
+            try:
+                asyncio.run(_broadcast())
+            except Exception:
+                pass
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -103,12 +177,21 @@ def _crime_event_dict(event: Any) -> Dict[str, Any]:
 
 def create_app(sim_state: SimulationState) -> FastAPI:
     """Build and return a fully-configured FastAPI application."""
+    
+    # Store reference to the FastAPI event loop for background thread broadcasting
+    import asyncio
+    sim_state.loop = asyncio.get_event_loop()
 
     app = FastAPI(
         title="Smart Crime AI — Backend API",
         description="REST endpoints consumed by the Unity frontend.",
         version="1.0.0",
     )
+
+    # --- Mount Static Reports Directory -----------------------------------
+    import os
+    os.makedirs("output/reports", exist_ok=True)
+    app.mount("/reports", StaticFiles(directory="output/reports"), name="reports")
 
     # --- CORS middleware (allow everything for development) ---------------
     app.add_middleware(
@@ -118,6 +201,25 @@ def create_app(sim_state: SimulationState) -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    # ── WebSocket /ws/state ──────────────────────────────────────────────
+
+    @app.websocket("/ws/state")
+    async def websocket_state(websocket: WebSocket):
+        """Websocket endpoint streaming state live every simulation tick."""
+        await websocket.accept()
+        sim_state.ws_clients.append(websocket)
+        try:
+            # Send initial state snapshot immediately
+            await websocket.send_json(sim_state.get_state_snapshot())
+            while True:
+                # Keep connection alive by waiting for client messages or disconnects
+                _ = await websocket.receive_text()
+        except WebSocketDisconnect:
+            pass
+        finally:
+            if websocket in sim_state.ws_clients:
+                sim_state.ws_clients.remove(websocket)
 
     # ── GET /state ──────────────────────────────────────────────────────
 
@@ -218,6 +320,38 @@ def create_app(sim_state: SimulationState) -> FastAPI:
                 return []
             recent = sim_state.crime_log.get_recent(limit)
             return [_crime_event_dict(ev) for ev in recent]
+
+    # ── GET /reports ────────────────────────────────────────────────────
+
+    @app.get("/reports")
+    def get_reports() -> Dict[str, Any]:
+        """Return the latest generated training report snapshot."""
+        import json
+        import os
+        latest_path = "output/latest_report.json"
+        if os.path.isfile(latest_path):
+            try:
+                with open(latest_path, 'r') as f:
+                    return json.load(f)
+            except Exception:
+                pass
+        return {"error": "No reports generated yet. Run some simulation ticks to trigger retrains."}
+
+    # ── GET /training-history ───────────────────────────────────────────
+
+    @app.get("/training-history")
+    def get_training_history() -> List[Dict[str, Any]]:
+        """Return the entire historical record of model retrain cycles."""
+        import json
+        import os
+        history_path = "output/training_history.json"
+        if os.path.isfile(history_path):
+            try:
+                with open(history_path, 'r') as f:
+                    return json.load(f)
+            except Exception:
+                pass
+        return []
 
     # ── POST /scenario ──────────────────────────────────────────────────
 
@@ -780,9 +914,10 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       <div class="glass-card">
         <div class="card-title">Scenario Interventions</div>
         <div class="controls-panel">
-          <div class="btn-group">
-            <button onclick="setPatrolMode('greedy')" id="btn-mode-greedy" class="primary">Greedy Patrol</button>
-            <button onclick="setPatrolMode('ai')" id="btn-mode-ai">AI (RL) Patrol</button>
+          <div class="btn-group" style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+            <button onclick="setPatrolMode('greedy')" id="btn-mode-greedy" class="primary" style="flex:1;">Greedy</button>
+            <button onclick="setPatrolMode('ai')" id="btn-mode-ai" style="flex:1;">Centralized RL</button>
+            <button onclick="setPatrolMode('marl')" id="btn-mode-marl" style="flex:1.2;">MARL Co-op</button>
           </div>
           <div class="btn-group">
             <button onclick="spawnPolice(1)">➕ Dispatch Officer</button>
@@ -792,6 +927,24 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             <button onclick="spawnCivilians(5)">🚶 Spawn Civilians (+5)</button>
           </div>
           <button onclick="resetMetrics()" class="danger" style="margin-top:0.5rem">🔄 Reset Statistics</button>
+        </div>
+      </div>
+
+      <!-- ML Reports & Confidence Curves -->
+      <div class="glass-card" id="ml-reports-card" style="display:none;">
+        <div class="card-title">ML Retrain Report & Curves</div>
+        <div style="display:flex; flex-direction:column; gap:0.75rem;">
+          <div style="font-size:0.8rem; color:var(--text-secondary);">
+            Dataset Size: <span id="rep-dataset-size" style="font-weight:bold; color:var(--text-primary);">0</span> rows
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem;">
+            <img id="chart-comparison" style="width:100%; border-radius:0.5rem; border:1px solid var(--border); cursor:pointer;" onclick="window.open(this.src)" title="Click to enlarge Comparison" />
+            <img id="chart-importance" style="width:100%; border-radius:0.5rem; border:1px solid var(--border); cursor:pointer;" onclick="window.open(this.src)" title="Click to enlarge Feature Importance" />
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem;">
+            <img id="chart-confusion" style="width:100%; border-radius:0.5rem; border:1px solid var(--border); cursor:pointer;" onclick="window.open(this.src)" title="Click to enlarge Confusion Matrix" />
+            <img id="chart-roc" style="width:100%; border-radius:0.5rem; border:1px solid var(--border); cursor:pointer;" onclick="window.open(this.src)" title="Click to enlarge ROC Curve" />
+          </div>
         </div>
       </div>
 
@@ -841,161 +994,227 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     }
 
     let activeCivilianCount = 30;
+    let usingWebsocket = false;
 
-    // Periodic polling function
-    async function poll() {
+    // --- State and UI Updates ---------------------------------------------
+    function updateUIWithState(state) {
+      // --- 1. Update Header Telemetry ---
+      document.getElementById('sim-tick').innerText = state.tick;
+      
+      // Format simulation time
+      const tod = state.time_of_day;
+      const hours = Math.floor(tod);
+      const mins = Math.floor((tod - hours) * 60);
+      const ampm = hours >= 12 ? 'PM' : 'AM';
+      const displayHours = hours % 12 === 0 ? 12 : hours % 12;
+      const displayMins = mins < 10 ? '0' + mins : mins;
+      document.getElementById('sim-time').innerText = `${displayHours}:${displayMins} ${ampm}`;
+
+      // --- 2. Update Grid Cells ---
+      const zonesMap = {};
+      state.zones.forEach(z => {
+        zonesMap[z.id] = z;
+      });
+
+      let civCount = 0;
+
+      for (let r = 0; r < 6; r++) {
+        for (let c = 0; c < 6; c++) {
+          const id = `${rows[r]}${c}`;
+          const zone = zonesMap[id];
+          const cell = document.getElementById(`cell-${id}`);
+          
+          if (!zone) continue;
+
+          cell.className = `zone-cell ${zone.zone_type}`;
+          document.getElementById(`badge-${id}`).innerText = zone.zone_type.substring(0, 4);
+
+          // Risk overlay
+          const riskContainer = document.getElementById(`risk-${id}`);
+          if (zone.risk_score > 0.05) {
+            const scorePct = Math.round(zone.risk_score * 100);
+            riskContainer.innerHTML = `<span style="color:#f87171">⚠️ ${scorePct}%</span>`;
+            const alpha = Math.min(zone.risk_score * 0.7, 0.95);
+            cell.style.backgroundColor = `rgba(239, 68, 68, ${alpha})`;
+          } else {
+            riskContainer.innerHTML = '';
+            cell.style.backgroundColor = '';
+          }
+
+          if (zone.is_hotspot) {
+            cell.classList.add('hotspot');
+          } else {
+            cell.classList.remove('hotspot');
+          }
+
+          document.getElementById(`tt-type-${id}`).innerText = zone.zone_type;
+          document.getElementById(`tt-light-${id}`).innerText = zone.lighting.toFixed(2);
+          document.getElementById(`tt-pop-${id}`).innerText = zone.population;
+          document.getElementById(`tt-pol-${id}`).innerText = zone.police_count;
+          document.getElementById(`tt-risk-${id}`).innerText = zone.risk_score.toFixed(4);
+
+          const agentsContainer = document.getElementById(`agents-${id}`);
+          agentsContainer.innerHTML = '';
+        }
+      }
+
+      // --- 3. Render Agent Badges ---
+      state.agents.forEach(agent => {
+        const container = document.getElementById(`agents-${agent.zone}`);
+        if (container) {
+          const dot = document.createElement('span');
+          dot.className = `agent-dot ${agent.type}`;
+          
+          let icon = '🚶';
+          if (agent.type === 'police') {
+            icon = '👮';
+            dot.title = `Officer: ${agent.id} (${agent.state})`;
+          } else if (agent.type === 'criminal') {
+            icon = '🦹';
+            dot.title = `Criminal: ${agent.id} (${agent.state})`;
+          } else {
+            civCount++;
+            dot.title = `Civilian: ${agent.id} (${agent.state})`;
+          }
+          
+          dot.innerText = icon;
+          container.appendChild(dot);
+        }
+      });
+
+      activeCivilianCount = civCount;
+
+      // --- 4. Update Crime log Feed ---
+      const feed = document.getElementById('log-feed');
+      feed.innerHTML = '';
+      if (state.crime_events && state.crime_events.length > 0) {
+        state.crime_events.forEach(ev => {
+          const item = document.createElement('div');
+          item.className = `log-item ${ev.caught ? 'caught' : 'crime'}`;
+          
+          const timeStr = `[${ev.time_of_day.toFixed(2)}]`;
+          const caughtBadge = ev.caught ? '🟢 INTERCEPTED' : '🔴 ESCAPED';
+          
+          item.innerHTML = `
+            <span>${timeStr} <b>${ev.type.toUpperCase()}</b> in <b>${ev.zone}</b></span>
+            <span>${caughtBadge}</span>
+          `;
+          feed.appendChild(item);
+        });
+      } else {
+        feed.innerHTML = `<div style="color:var(--text-secondary); text-align:center; padding-top:2rem;">No crime events logged yet.</div>`;
+      }
+    }
+
+    // --- Metrics Updates --------------------------------------------------
+    function updateMetrics(metrics) {
+      const mode = metrics.patrol_mode || 'greedy';
+      const modeBadge = document.getElementById('patrol-mode-badge');
+      modeBadge.innerText = mode.toUpperCase();
+      
+      document.getElementById('btn-mode-greedy').className = '';
+      document.getElementById('btn-mode-ai').className = '';
+      document.getElementById('btn-mode-marl').className = '';
+      
+      if (mode === 'ai') {
+        modeBadge.style.color = 'var(--accent-purple)';
+        document.getElementById('btn-mode-ai').className = 'primary';
+      } else if (mode === 'marl') {
+        modeBadge.style.color = 'var(--accent-orange)';
+        document.getElementById('btn-mode-marl').className = 'primary';
+      } else {
+        modeBadge.style.color = 'var(--accent-blue)';
+        document.getElementById('btn-mode-greedy').className = 'primary';
+      }
+
+      document.getElementById('m-total-crimes').innerText = metrics.total_crimes;
+      document.getElementById('m-caught-crimes').innerText = metrics.total_caught;
+      
+      const catchRate = metrics.catch_rate || 0.0;
+      document.getElementById('m-catch-rate').innerText = `${(catchRate * 100).toFixed(1)}%`;
+      
+      const avgResp = metrics.avg_response_time;
+      document.getElementById('m-resp-time').innerText = avgResp ? `${avgResp.toFixed(1)} ticks` : '-- ticks';
+      
+      const patrolEff = metrics.patrol_efficiency || 0.0;
+      document.getElementById('m-patrol-eff').innerText = `${(patrolEff * 100).toFixed(1)}%`;
+    }
+
+    // --- ML Reports Updates ------------------------------------------------
+    async function updateMLReport() {
       try {
-        const [stateRes, metricsRes] = await Promise.all([
-          fetch('/state'),
-          fetch('/metrics')
-        ]);
-        
-        const state = await stateRes.json();
-        const metrics = await metricsRes.json();
-        
-        // --- 1. Update Header Telemetry --------------------------------------
-        document.getElementById('sim-tick').innerText = state.tick;
-        
-        // Format simulation time nicely
-        const tod = state.time_of_day;
-        const hours = Math.floor(tod);
-        const mins = Math.floor((tod - hours) * 60);
-        const ampm = hours >= 12 ? 'PM' : 'AM';
-        const displayHours = hours % 12 === 0 ? 12 : hours % 12;
-        const displayMins = mins < 10 ? '0' + mins : mins;
-        document.getElementById('sim-time').innerText = `${displayHours}:${displayMins} ${ampm}`;
-        
-        // Patrol mode badges
-        const mode = metrics.patrol_mode || 'greedy';
-        const modeBadge = document.getElementById('patrol-mode-badge');
-        modeBadge.innerText = mode.toUpperCase();
-        if (mode === 'ai') {
-          modeBadge.style.color = 'var(--accent-purple)';
-          document.getElementById('btn-mode-ai').className = 'primary';
-          document.getElementById('btn-mode-greedy').className = '';
-        } else {
-          modeBadge.style.color = 'var(--accent-blue)';
-          document.getElementById('btn-mode-greedy').className = 'primary';
-          document.getElementById('btn-mode-ai').className = '';
+        const res = await fetch('/reports');
+        const report = await res.json();
+        if (report && !report.error) {
+          document.getElementById('ml-reports-card').style.display = 'block';
+          document.getElementById('rep-dataset-size').innerText = report.dataset_size;
+          
+          const buster = `?t=${new Date().getTime()}`;
+          document.getElementById('chart-comparison').src = report.charts.model_comparison + buster;
+          document.getElementById('chart-importance').src = report.charts.feature_importance + buster;
+          document.getElementById('chart-confusion').src = report.charts.confusion_matrix + buster;
+          document.getElementById('chart-roc').src = report.charts.roc_curve + buster;
         }
-
-        // --- 2. Update Grid Cells --------------------------------------------
-        const zonesMap = {};
-        state.zones.forEach(z => {
-          zonesMap[z.id] = z;
-        });
-
-        // Track civilian count
-        let civCount = 0;
-
-        for (let r = 0; r < 6; r++) {
-          for (let c = 0; c < 6; c++) {
-            const id = `${rows[r]}${c}`;
-            const zone = zonesMap[id];
-            const cell = document.getElementById(`cell-${id}`);
-            
-            if (!zone) continue;
-
-            // Reset type styles and assign current
-            cell.className = `zone-cell ${zone.zone_type}`;
-            document.getElementById(`badge-${id}`).innerText = zone.zone_type.substring(0, 4);
-
-            // Risk overlays
-            const riskContainer = document.getElementById(`risk-${id}`);
-            if (zone.risk_score > 0.05) {
-              const scorePct = Math.round(zone.risk_score * 100);
-              riskContainer.innerHTML = `<span style="color:#f87171">⚠️ ${scorePct}%</span>`;
-              // Gradient-shift background based on risk
-              const alpha = Math.min(zone.risk_score * 0.7, 0.95);
-              cell.style.backgroundColor = `rgba(239, 68, 68, ${alpha})`;
-            } else {
-              riskContainer.innerHTML = '';
-              cell.style.backgroundColor = '';
-            }
-
-            // Hotspot visual glow pulse
-            if (zone.is_hotspot) {
-              cell.classList.add('hotspot');
-            } else {
-              cell.classList.remove('hotspot');
-            }
-
-            // Update tooltip details
-            document.getElementById(`tt-type-${id}`).innerText = zone.zone_type;
-            document.getElementById(`tt-light-${id}`).innerText = zone.lighting.toFixed(2);
-            document.getElementById(`tt-pop-${id}`).innerText = zone.population;
-            document.getElementById(`tt-pol-${id}`).innerText = zone.police_count;
-            document.getElementById(`tt-risk-${id}`).innerText = zone.risk_score.toFixed(4);
-
-            // Clear agent display
-            const agentsContainer = document.getElementById(`agents-${id}`);
-            agentsContainer.innerHTML = '';
-          }
-        }
-
-        // --- 3. Render Agent Badges ------------------------------------------
-        state.agents.forEach(agent => {
-          const container = document.getElementById(`agents-${agent.zone}`);
-          if (container) {
-            const dot = document.createElement('span');
-            dot.className = `agent-dot ${agent.type}`;
-            
-            // Emoji mappings
-            let icon = '🚶';
-            if (agent.type === 'police') {
-              icon = '👮';
-              dot.title = `Officer: ${agent.id} (${agent.state})`;
-            } else if (agent.type === 'criminal') {
-              icon = '🦹';
-              dot.title = `Criminal: ${agent.id} (${agent.state})`;
-            } else {
-              civCount++;
-              dot.title = `Civilian: ${agent.id} (${agent.state})`;
-            }
-            
-            dot.innerText = icon;
-            container.appendChild(dot);
-          }
-        });
-
-        activeCivilianCount = civCount;
-
-        // --- 4. Update Sidebar Metrics ---------------------------------------
-        document.getElementById('m-total-crimes').innerText = metrics.total_crimes;
-        document.getElementById('m-caught-crimes').innerText = metrics.total_caught;
-        
-        const catchRate = metrics.catch_rate || 0.0;
-        document.getElementById('m-catch-rate').innerText = `${(catchRate * 100).toFixed(1)}%`;
-        
-        const avgResp = metrics.avg_response_time;
-        document.getElementById('m-resp-time').innerText = avgResp ? `${avgResp.toFixed(1)} ticks` : '-- ticks';
-        
-        const patrolEff = metrics.patrol_efficiency || 0.0;
-        document.getElementById('m-patrol-eff').innerText = `${(patrolEff * 100).toFixed(1)}%`;
-
-        // --- 5. Update Crime log Feed ----------------------------------------
-        const feed = document.getElementById('log-feed');
-        feed.innerHTML = '';
-        if (state.crime_events && state.crime_events.length > 0) {
-          state.crime_events.forEach(ev => {
-            const item = document.createElement('div');
-            item.className = `log-item ${ev.caught ? 'caught' : 'crime'}`;
-            
-            const timeStr = `[${ev.time_of_day.toFixed(2)}]`;
-            const caughtBadge = ev.caught ? '🟢 INTERCEPTED' : '🔴 ESCAPED';
-            
-            item.innerHTML = `
-              <span>${timeStr} <b>${ev.type.toUpperCase()}</b> in <b>${ev.zone}</b></span>
-              <span>${caughtBadge}</span>
-            `;
-            feed.appendChild(item);
-          });
-        } else {
-          feed.innerHTML = `<div style="color:var(--text-secondary); text-align:center; padding-top:2rem;">No crime events logged yet.</div>`;
-        }
-
       } catch (err) {
-        console.error("Dashboard polling error: ", err);
+        console.error("Error loading ML report: ", err);
+      }
+    }
+
+    // --- WebSocket Stream Setup -------------------------------------------
+    let ws;
+    function connectWS() {
+      const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${proto}//${window.location.host}/ws/state`;
+      
+      console.log(`Connecting to WebSocket: ${wsUrl}`);
+      ws = new WebSocket(wsUrl);
+      
+      ws.onopen = function() {
+        console.log("WebSocket stream connected successfully!");
+        usingWebsocket = true;
+      };
+      
+      ws.onmessage = function(event) {
+        try {
+          const state = JSON.parse(event.data);
+          updateUIWithState(state);
+        } catch (err) {
+          console.error("Error parsing WS message: ", err);
+        }
+      };
+      
+      ws.onclose = function() {
+        console.log("WebSocket stream disconnected. Reconnecting in 3s...");
+        usingWebsocket = false;
+        setTimeout(connectWS, 3000);
+      };
+      
+      ws.onerror = function(err) {
+        console.error("WebSocket error: ", err);
+        ws.close();
+      };
+    }
+
+    // --- HTTP Fallback Polling (if WebSocket unavailable) ------------------
+    async function pollStateFallback() {
+      if (usingWebsocket) return; // skip if streaming via WS
+      try {
+        const res = await fetch('/state');
+        const state = await res.json();
+        updateUIWithState(state);
+      } catch (err) {
+        console.error("Fallback polling error: ", err);
+      }
+    }
+
+    // --- Regular Telemetry Polling (metrics / report) ----------------------
+    async function pollTelemetry() {
+      try {
+        const res = await fetch('/metrics');
+        const metrics = await res.json();
+        updateMetrics(metrics);
+      } catch (err) {
+        console.error("Telemetry polling error: ", err);
       }
     }
 
@@ -1006,7 +1225,8 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ set_patrol_mode: mode })
       });
-      poll();
+      pollTelemetry();
+      pollStateFallback();
     }
 
     async function spawnPolice(count) {
@@ -1023,7 +1243,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
           body: JSON.stringify({ remove_police: Math.abs(count) })
         });
       }
-      poll();
+      pollStateFallback();
     }
 
     async function spawnCivilians(addAmount) {
@@ -1033,7 +1253,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ set_civilian_count: targetCount })
       });
-      poll();
+      pollStateFallback();
     }
 
     async function resetMetrics() {
@@ -1042,13 +1262,22 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ reset_metrics: true })
       });
-      poll();
+      pollTelemetry();
+      pollStateFallback();
     }
 
-    // Set polling interval (500ms aligns with SIMULATION_TICK_SLEEP = 0.5s)
-    setInterval(poll, 500);
-    // Initial run
-    poll();
+    // Start WebSocket connection
+    connectWS();
+
+    // Set polling timers
+    setInterval(pollStateFallback, 500); // 500ms fallback for state
+    setInterval(pollTelemetry, 1000);     // 1s for metrics
+    setInterval(updateMLReport, 5000);     // 5s for ML charts
+
+    // Initial triggers
+    pollStateFallback();
+    pollTelemetry();
+    updateMLReport();
   </script>
 </body>
 </html>

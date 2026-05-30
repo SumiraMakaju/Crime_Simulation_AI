@@ -215,7 +215,12 @@ class PatrolRLAgent:
 
     # ── loading ─────────────────────────────────────────────────────────
 
-    def load(self, path: Optional[str] = None) -> bool:
+    def load(
+        self,
+        path: Optional[str] = None,
+        expected_obs_shape: Optional[Tuple[int, ...]] = None,
+        expected_action_nvec: Optional[List[int]] = None,
+    ) -> bool:
         """Attempt to load a previously saved PPO policy.
 
         Returns ``True`` if a model was loaded successfully, ``False``
@@ -231,7 +236,27 @@ class PatrolRLAgent:
         try:
             from stable_baselines3 import PPO
 
-            self.model = PPO.load(load_path, device=self.device)
+            loaded_model = PPO.load(load_path, device=self.device)
+
+            # Verify observation space shape compatibility
+            if expected_obs_shape is not None:
+                if hasattr(loaded_model, "observation_space") and loaded_model.observation_space is not None:
+                    loaded_obs_shape = loaded_model.observation_space.shape
+                    if loaded_obs_shape != expected_obs_shape:
+                        print(f"[RL] Loaded policy has incompatible observation shape {loaded_obs_shape}, expected {expected_obs_shape}. Discarding.")
+                        return False
+
+            # Verify action space compatibility
+            if expected_action_nvec is not None:
+                if hasattr(loaded_model, "action_space") and loaded_model.action_space is not None:
+                    if not hasattr(loaded_model.action_space, "nvec"):
+                        print(f"[RL] Loaded policy does not have expected MultiDiscrete action space. Discarding.")
+                        return False
+                    if list(loaded_model.action_space.nvec) != list(expected_action_nvec):
+                        print(f"[RL] Loaded policy has incompatible action nvec {list(loaded_model.action_space.nvec)}, expected {list(expected_action_nvec)}. Discarding.")
+                        return False
+
+            self.model = loaded_model
             self.is_trained = True
             print(f"[RL] Policy loaded from {load_path}")
             return True
@@ -268,12 +293,40 @@ class PatrolRLAgent:
         obs_array = np.array(obs, dtype=np.float32)
         action, _ = self.model.predict(obs_array, deterministic=True)
 
+        # Handle potential shape mismatch if police_agents count differs from trained count
+        trained_police_count = 1
+        if hasattr(action, "ndim") and action.ndim > 0:
+            trained_police_count = action.shape[0]
+        elif hasattr(action, "__len__"):
+            trained_police_count = len(action)
+        elif isinstance(action, (np.ndarray, list)):
+            trained_police_count = len(action)
+
         routes: Dict[str, List[str]] = {}
         sorted_agents = sorted(police_agents, key=lambda a: a.agent_id)
 
         for i, agent in enumerate(sorted_agents):
-            zone_idx = int(action[i]) % len(sorted_zone_ids)
-            primary_zid = sorted_zone_ids[zone_idx]
+            if i < trained_police_count:
+                # Use the trained PPO policy prediction
+                if trained_police_count == 1:
+                    val = int(action)
+                else:
+                    val = int(action[i])
+                zone_idx = val % len(sorted_zone_ids)
+                primary_zid = sorted_zone_ids[zone_idx]
+            else:
+                # Fallback for extra police officers dynamically added
+                global_sorted = sorted(
+                    sorted_zone_ids,
+                    key=lambda zid: environment.get_zone(zid).risk_score,
+                    reverse=True,
+                )
+                assigned_primaries = [routes[a.agent_id][0] for a in sorted_agents[:i] if a.agent_id in routes]
+                primary_zid = sorted_zone_ids[0]
+                for zid in global_sorted:
+                    if zid not in assigned_primaries:
+                        primary_zid = zid
+                        break
 
             # Extend route to GREEDY_ROUTE_LENGTH with adjacent high-risk zones
             route = [primary_zid]

@@ -63,7 +63,7 @@ PREDICTION_INTERVAL = 5           # run predictor every N ticks
 PATROL_UPDATE_INTERVAL = 5        # re-optimize patrol routes every N ticks
 
 # ─── Hotspot ───────────────────────────────────────────────────────────────────
-HOTSPOT_RISK_THRESHOLD = 0.65
+HOTSPOT_RISK_THRESHOLD = 0.30
 
 # ─── RL ────────────────────────────────────────────────────────────────────────
 RL_TOTAL_TIMESTEPS = 5000         # reduced from 50 000 for quick first run
@@ -92,3 +92,25 @@ RL_POLICY_PATH = "output/rl_policy"
 # ─── API ───────────────────────────────────────────────────────────────────────
 API_HOST = "0.0.0.0"
 API_PORT = 8000
+
+# ─── Diurnal Civilian Schedules ────────────────────────────────────────────────
+COMMUTE_MORNING_START = 6.0
+COMMUTE_MORNING_END = 9.0
+COMMUTE_EVENING_START = 17.0
+COMMUTE_EVENING_END = 20.0
+SCHEDULE_BIAS_STRENGTH = 0.7       # probability of following schedule vs random walk
+
+# ─── Graph Neural Network (GNN) ────────────────────────────────────────────────
+GNN_HIDDEN_DIM = 32
+GNN_EPOCHS = 50
+GNN_LR = 0.001
+GNN_MODEL_PATH = "output/gnn_model.pt"
+GNN_ENSEMBLE_WEIGHT = 0.6          # Weight of GNN predictions (RF weight will be 0.4)
+
+# ─── Multi-Agent Reinforcement Learning (MARL) ─────────────────────────────────
+MARL_TOTAL_TIMESTEPS = 8000
+MARL_POLICY_PATH = "output/marl_policy"
+MARL_REWARD_INTERCEPT = 10.0
+MARL_REWARD_MISS = -2.0
+MARL_REWARD_OVERLAP = -1.5
+MARL_REWARD_COVERAGE = 1.0

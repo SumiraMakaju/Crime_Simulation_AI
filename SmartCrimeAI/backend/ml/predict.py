@@ -3,18 +3,21 @@
 import numpy as np
 import pandas as pd
 
-from config import HOTSPOT_RISK_THRESHOLD, MODEL_PATH
+from config import HOTSPOT_RISK_THRESHOLD, MODEL_PATH, GNN_ENSEMBLE_WEIGHT
 from ml.dataset import FeatureExtractor
 from ml.train_model import ModelTrainer
+from ml.gnn_model import GNNTrainer
 
 
 class CrimePredictor:
-    """High-level facade that wires together :class:`ModelTrainer` and
-    :class:`FeatureExtractor` to produce per-zone crime risk predictions.
+    """High-level facade that wires together :class:`ModelTrainer`,
+    :class:`GNNTrainer`, and :class:`FeatureExtractor` to produce
+    ensemble per-zone crime risk predictions.
     """
 
     def __init__(self) -> None:
         self.trainer: ModelTrainer | None = None
+        self.gnn_trainer: GNNTrainer | None = None
         self.extractor: FeatureExtractor = FeatureExtractor()
         self.is_ready: bool = False
 
@@ -38,6 +41,11 @@ class CrimePredictor:
         self.trainer = ModelTrainer()
         loaded = self.trainer.load(path)
         self.is_ready = loaded
+        
+        # Load GNN if available
+        self.gnn_trainer = GNNTrainer()
+        gnn_loaded = self.gnn_trainer.load()
+        
         return self.is_ready
 
     def set_trainer(self, trainer: ModelTrainer) -> None:
@@ -50,6 +58,10 @@ class CrimePredictor:
         """
         self.trainer = trainer
         self.is_ready = trainer.is_trained
+
+    def set_gnn_trainer(self, gnn_trainer: GNNTrainer) -> None:
+        """Inject an already-trained :class:`GNNTrainer`."""
+        self.gnn_trainer = gnn_trainer
 
     # ------------------------------------------------------------------ #
     #  Prediction                                                          #
@@ -76,16 +88,30 @@ class CrimePredictor:
         columns = self.extractor.feature_columns()
         results: dict = {}
 
+        # GNN predictions if available
+        gnn_preds = {}
+        if self.gnn_trainer and self.gnn_trainer.is_trained:
+            try:
+                gnn_preds = self.gnn_trainer.predict(environment)
+            except Exception as e:
+                print(f"[CrimePredictor] GNN prediction error: {e}")
+
         for zone in environment.zones.values():
             features = self.extractor.extract(zone, environment)
 
             # Build a single-row DataFrame in canonical column order
             row = pd.DataFrame([features], columns=columns)
 
-            # Probability of crime (class = 1)
+            # Probability of crime (class = 1) from Random Forest
             proba = self.trainer.classifier.predict_proba(row)
             # predict_proba returns shape (1, n_classes); class-1 is last col
-            risk_score = float(proba[0, -1])
+            rf_score = float(proba[0, -1])
+
+            # Ensemble with GNN if available
+            if zone.zone_id in gnn_preds:
+                risk_score = (1 - GNN_ENSEMBLE_WEIGHT) * rf_score + GNN_ENSEMBLE_WEIGHT * gnn_preds[zone.zone_id]
+            else:
+                risk_score = rf_score
 
             # Time-until-crime proxy from the Ridge regressor
             raw_window = self.trainer.regressor.predict(row)[0]
