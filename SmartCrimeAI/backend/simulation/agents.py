@@ -234,13 +234,22 @@ class CriminalAgent:
 
     @staticmethod
     def _opportunity_score(zone) -> float:
-        """Compute how attractive *zone* is for committing a crime."""
+        """Compute how attractive *zone* is for committing a crime with latent variables and noise."""
         lighting_term = (1.0 - zone.lighting) * CRIME_WEIGHT_LIGHTING
         police_ratio = min(zone.police_count, CRIME_MAX_POLICE_CAP) / CRIME_MAX_POLICE_CAP
         police_term = (1.0 - police_ratio) * CRIME_WEIGHT_POLICE
         pop_ratio = min(zone.population, CRIME_MAX_POPULATION_CAP) / CRIME_MAX_POPULATION_CAP
         population_term = pop_ratio * CRIME_WEIGHT_POPULATION
-        return lighting_term + police_term + population_term
+        
+        base_opp = lighting_term + police_term + population_term
+        
+        # Add latent unobserved crime attractor (Approach 3)
+        latent_factor = getattr(zone, "hidden_crime_attractor", 0.0)
+        
+        # Add dynamic Gaussian noise (Approach 1)
+        noise = random.gauss(0, 0.06)
+        
+        return max(0.0, min(1.0, base_opp + latent_factor + noise))
 
     # ------------------------------------------------------------------ #
 
