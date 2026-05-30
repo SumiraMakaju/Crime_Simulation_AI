@@ -312,7 +312,7 @@ def main() -> None:  # noqa: C901 — intentionally monolithic orchestrator
                 if dataset_size >= ML_MIN_ROWS and trainer.should_retrain(dataset_size):
                     if not getattr(trainer, "is_currently_retraining", False):
                         trainer.is_currently_retraining = True
-                        print(f"  [ML] Starting background retrain thread at Tick {env.tick}...")
+                        print(f"  [ML] Starting background retrain thread at Tick {env.tick} (Database: {dataset_size} rows)...")
                         
                         current_tick = env.tick
                         
@@ -330,10 +330,10 @@ def main() -> None:  # noqa: C901 — intentionally monolithic orchestrator
                                     
                                     # Generate training reports & charts
                                     if trainer.X_test is not None and trainer.y_test is not None:
-                                        ReportGenerator.generate_full_report(trainer, gnn_trainer, trainer.X_test, trainer.y_test, current_tick)
+                                        ReportGenerator.generate_full_report(trainer, gnn_trainer, trainer.X_test, trainer.y_test, current_tick, len(X))
                                         
                                     metric_logger.ml_metrics = eval_metrics
-                                    print(f"  [ML] Background retrain complete at Tick {current_tick}. Metrics: {eval_metrics}")
+                                    print(f"  [ML] Background retrain complete at Tick {current_tick} (Database: {len(X)} rows). Metrics: {eval_metrics}")
                             except Exception as bg_exc:
                                 print(f"  [ML] Background retrain error: {bg_exc}")
                             finally:
