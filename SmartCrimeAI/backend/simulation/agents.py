@@ -287,8 +287,8 @@ class CriminalAgent:
         if police_nearby:
             self.state = "fleeing"
             # Move to the neighbor with the fewest police, preferring not-hot zones
-            best = None
             best_score = float("inf")
+            candidates = []
             for n in zone.neighbors:
                 nz = environment.get_zone(n)
                 score = nz.police_count
@@ -296,7 +296,11 @@ class CriminalAgent:
                     score += 100  # heavy penalty
                 if score < best_score:
                     best_score = score
-                    best = n
+                    candidates = [n]
+                elif score == best_score:
+                    candidates.append(n)
+            
+            best = random.choice(candidates) if candidates else None
             if best and best != self.zone_id:
                 self._move_to(best, environment)
             return None
