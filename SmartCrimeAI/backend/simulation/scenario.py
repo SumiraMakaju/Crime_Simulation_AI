@@ -118,7 +118,7 @@ class ScenarioEngine:
             changes.append(f"time jumped to {target_hour:.1f}h")
 
         if "reset_metrics" in config:
-            self.metric_logger.reset()
+            self.metric_logger.reset(self.environment.tick)
             changes.append("metrics reset")
 
         self.log.append({

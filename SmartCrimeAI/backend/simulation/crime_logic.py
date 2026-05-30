@@ -223,6 +223,7 @@ class MetricLogger:
         self.patrol_ticks_in_risk_zones: int = 0
         self.patrol_total_ticks: int = 0
         self.ml_metrics: dict = {}
+        self.reset_tick: int = 0
 
     # ------------------------------------------------------------------ #
     #  Logging
@@ -276,7 +277,7 @@ class MetricLogger:
             "mode_counters": self.mode_counters,
         }
 
-    def reset(self) -> None:
+    def reset(self, reset_tick: int = 0) -> None:
         """Clear all counters back to zero."""
         self.total_crimes = 0
         self.total_caught = 0
@@ -286,3 +287,4 @@ class MetricLogger:
         self.ml_metrics = {}
         for mode in self.mode_counters:
             self.mode_counters[mode] = {"crimes": 0, "caught": 0}
+        self.reset_tick = reset_tick
