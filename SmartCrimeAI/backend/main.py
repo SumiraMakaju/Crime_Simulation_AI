@@ -20,9 +20,12 @@ from simulation.scenario import ScenarioEngine
 from ml.predict import CrimePredictor
 from ml.train_model import ModelTrainer
 from ml.dataset import load_dataset
+from ml.gnn_model import GNNTrainer
+from ml.ml_reports import ReportGenerator
 
 from optimization.greedy_patrol import GreedyPatrolOptimizer
 from optimization.rl_patrol import PatrolRLAgent
+from optimization.marl_patrol import MARLCoordinator
 
 from api.server import create_app, SimulationState
 
@@ -61,13 +64,18 @@ def main() -> None:  # noqa: C901 — intentionally monolithic orchestrator
     # ── 2. Spawn agents at random zones ──────────────────────────────────
     zone_ids = list(env.zone_ids)
 
+    residential_zones = [z.zone_id for z in env.zones.values() if z.zone_type == "residential"]
+    if not residential_zones:
+        residential_zones = list(env.zone_ids)
+
     civilians = []
     for i in range(DEFAULT_CIVILIAN_COUNT):
         zid = random.choice(zone_ids)
         zone = env.get_zone(zid)
         col = getattr(zone, "col", 0)
         row = getattr(zone, "row", 0)
-        civ = CivilianAgent(f"civ_{i}", zid, col, row)
+        home_zid = random.choice(residential_zones)
+        civ = CivilianAgent(f"civ_{i}", zid, col, row, home_zone_id=home_zid)
         civilians.append(civ)
         zone.population = getattr(zone, "population", 0) + 1
 
@@ -106,21 +114,58 @@ def main() -> None:  # noqa: C901 — intentionally monolithic orchestrator
     trainer = ModelTrainer()
     loaded_ml = trainer.load()  # attempt to load saved model
     if loaded_ml:
-        print("[INIT] ML model loaded from disk.")
+        print("[INIT] ML Random Forest model loaded from disk.")
     else:
-        print("[INIT] ⚠  No saved ML model found — predictions disabled until enough data is collected.")
+        print("[INIT] ⚠  No saved ML RF model found — predictions disabled until enough data is collected.")
+
+    gnn_trainer = GNNTrainer()
+    loaded_gnn = gnn_trainer.load()
+    if loaded_gnn:
+        print("[INIT] ML CrimeGCN GNN model loaded from disk.")
+    else:
+        print("[INIT] ⚠  No saved GNN model found — will train on first retrain cycle.")
 
     predictor = CrimePredictor()
     predictor.set_trainer(trainer)
+    predictor.set_gnn_trainer(gnn_trainer)
 
     # ── 5. Patrol optimizers ─────────────────────────────────────────────
     greedy_optimizer = GreedyPatrolOptimizer()
     rl_agent = PatrolRLAgent()
-    loaded_rl = rl_agent.load()  # attempt to load saved policy
+    expected_n_zones = len(env.zone_ids)
+    expected_n_police = len(police)
+    loaded_rl = rl_agent.load(
+        expected_obs_shape=(expected_n_zones * 3,),
+        expected_action_nvec=[expected_n_zones] * expected_n_police
+    )  # attempt to load saved policy
     if loaded_rl:
-        print("[INIT] RL patrol policy loaded from disk.")
+        print("[INIT] Centralized RL patrol policy loaded from disk.")
     else:
-        print("[INIT] ⚠  No saved RL policy found — using greedy/random patrol until trained.")
+        print("[INIT] ⚠  No saved Centralized RL policy found! Automatically training fresh policy on startup...")
+        # Temp list of agents to configure observation spaces
+        temp_police = [PoliceAgent(f"train_pol_{i}", "A0", 0, 0) for i in range(4)]
+        temp_civs = [CivilianAgent(f"train_civ_{i}", "A0", 0, 0) for i in range(30)]
+        temp_crims = [CriminalAgent(f"train_crim_{i}", "A0", 0, 0) for i in range(5)]
+        temp_crime_log = CrimeLog()
+        try:
+            rl_agent.train(env, temp_police, temp_civs, temp_crims, temp_crime_log)
+        except Exception as e:
+            print(f"[INIT ERROR] Failed to train Centralized RL on startup: {e}")
+
+    marl_coordinator = MARLCoordinator()
+    loaded_marl = marl_coordinator.load()
+    if loaded_marl:
+        print("[INIT] MARL police coordination policy loaded from disk.")
+    else:
+        print("[INIT] ⚠  No saved MARL policy found! Automatically training fresh MARL policy on startup...")
+        temp_police = [PoliceAgent(f"train_pol_{i}", "A0", 0, 0) for i in range(4)]
+        temp_civs = [CivilianAgent(f"train_civ_{i}", "A0", 0, 0) for i in range(30)]
+        temp_crims = [CriminalAgent(f"train_crim_{i}", "A0", 0, 0) for i in range(5)]
+        temp_crime_log = CrimeLog()
+        try:
+            marl_coordinator.train(env, temp_police, temp_civs, temp_crims, temp_crime_log)
+        except Exception as e:
+            print(f"[INIT ERROR] Failed to train MARL Coordinator on startup: {e}")
 
     patrol_routes: dict[str, list[str]] = {}
 
@@ -135,6 +180,8 @@ def main() -> None:  # noqa: C901 — intentionally monolithic orchestrator
     sim_state.scenario_engine = scenario_engine
     sim_state.patrol_routes = patrol_routes
     sim_state.predictor = predictor
+    sim_state.gnn_trainer = gnn_trainer
+    sim_state.marl_coordinator = marl_coordinator
 
     app = create_app(sim_state)
 
@@ -190,9 +237,11 @@ def main() -> None:  # noqa: C901 — intentionally monolithic orchestrator
                 if env.tick % PATROL_UPDATE_INTERVAL == 0:
                     patrol_mode = getattr(scenario_engine, "patrol_mode", "greedy")
 
-                    if patrol_mode == "ai" and rl_agent.is_trained:
+                    if patrol_mode == "marl" and marl_coordinator.is_trained:
+                        patrol_routes = marl_coordinator.get_patrol_routes(env, police)
+                    elif patrol_mode == "ai" and rl_agent.is_trained:
                         patrol_routes = rl_agent.get_patrol_routes(env, police)
-                    elif patrol_mode == "greedy" or not rl_agent.is_trained:
+                    elif patrol_mode == "greedy" or (patrol_mode == "ai" and not rl_agent.is_trained) or (patrol_mode == "marl" and not marl_coordinator.is_trained):
                         patrol_routes = greedy_optimizer.optimize(police, env)
                     else:  # random fallback
                         patrol_routes = {
@@ -259,8 +308,17 @@ def main() -> None:  # noqa: C901 — intentionally monolithic orchestrator
                             eval_metrics = trainer.online_retrain(X, y)
                             trainer.save()
                             predictor.set_trainer(trainer)
+                            
+                            # Retrain GNN alongside Random Forest
+                            gnn_metrics = gnn_trainer.train(env)
+                            predictor.set_gnn_trainer(gnn_trainer)
+                            
+                            # Generate training reports & charts
+                            if trainer.X_test is not None and trainer.y_test is not None:
+                                ReportGenerator.generate_full_report(trainer, gnn_trainer, trainer.X_test, trainer.y_test, env.tick)
+                                
                             metric_logger.ml_metrics = eval_metrics
-                            print(f"  [ML] Retrained on {len(X)} rows. Metrics: {eval_metrics}")
+                            print(f"  [ML] Retrained RF and GNN on {len(X)} rows. Metrics: {eval_metrics}")
                     except Exception as exc:
                         print(f"  [ML] Retrain error: {exc}")
 
@@ -276,6 +334,13 @@ def main() -> None:  # noqa: C901 — intentionally monolithic orchestrator
                 f"Total: {total_crimes} | "
                 f"Mode: {patrol_mode}"
             )
+
+            # Broadcast simulation state to all connected WebSockets
+            if hasattr(sim_state, "broadcast_state"):
+                try:
+                    sim_state.broadcast_state()
+                except Exception as exc:
+                    print(f"[WS] Broadcast error: {exc}")
 
             time.sleep(SIMULATION_TICK_SLEEP)
 

@@ -58,10 +58,10 @@ class CivilianAgent:
     """
     A civilian who wanders the grid, avoids crime-affected zones, and may
     flee due to direct crime exposure or social influence from nearby
-    fleeing civilians.
+    fleeing civilians. Follows a 24-hour diurnal commute schedule.
     """
 
-    def __init__(self, agent_id: str, zone_id: str, zone_col: int, zone_row: int) -> None:
+    def __init__(self, agent_id: str, zone_id: str, zone_col: int, zone_row: int, home_zone_id: Optional[str] = None) -> None:
         self.agent_id: str = agent_id
         self.zone_id: str = zone_id
         self.x: float
@@ -70,6 +70,25 @@ class CivilianAgent:
         self.state: str = "walking"
         self.flee_timer: int = 0
         self.danger_memory: Set[str] = set()
+        self.home_zone_id: str = home_zone_id if home_zone_id is not None else zone_id
+
+    @staticmethod
+    def _preferred_zone_type(time_of_day: float) -> str:
+        """Determines preferred zone type based on the time of day."""
+        from config import (
+            COMMUTE_MORNING_START,
+            COMMUTE_MORNING_END,
+            COMMUTE_EVENING_START,
+            COMMUTE_EVENING_END,
+        )
+        if COMMUTE_MORNING_START <= time_of_day < COMMUTE_MORNING_END:
+            return "commercial"  # morning commute to work
+        elif COMMUTE_MORNING_END <= time_of_day < COMMUTE_EVENING_START:
+            return "commercial"  # daytime work hours
+        elif COMMUTE_EVENING_START <= time_of_day < COMMUTE_EVENING_END:
+            return "residential"  # evening commute home
+        else:
+            return "residential"  # nighttime home hours
 
     # ------------------------------------------------------------------ #
 
@@ -131,11 +150,48 @@ class CivilianAgent:
         if not safe_neighbors:
             safe_neighbors = list(neighbors)  # fallback: pick any
 
-        # Weight by activity — higher weight → more likely to move
-        if random.random() < activity_weight and safe_neighbors:
-            new_zone_id = random.choice(safe_neighbors)
+        preferred_type = self._preferred_zone_type(tod)
+        from config import SCHEDULE_BIAS_STRENGTH
+
+        # Decide if civilian follows diurnal commute schedule or does active walk
+        if random.random() < SCHEDULE_BIAS_STRENGTH and safe_neighbors:
+            is_going_home = (tod >= 17.0 or tod < 6.0)
+            if is_going_home and self.home_zone_id:
+                if self.home_zone_id in safe_neighbors:
+                    new_zone_id = self.home_zone_id
+                else:
+                    # Move towards home zone using Manhattan distance
+                    home_row, home_col = _zone_to_rc(self.home_zone_id)
+                    best_neighbor = None
+                    min_dist = 999.0
+                    for n_id in safe_neighbors:
+                        nr, nc = _zone_to_rc(n_id)
+                        dist = abs(nr - home_row) + abs(nc - home_col)
+                        if dist < min_dist:
+                            min_dist = dist
+                            best_neighbor = n_id
+                    new_zone_id = best_neighbor if best_neighbor is not None else self.zone_id
+            else:
+                # Commuting or working at commercial/intersection zones
+                matched = [n for n in safe_neighbors if environment.get_zone(n).zone_type == preferred_type]
+                if preferred_type == "commercial":
+                    # intersections also act as work/travel areas
+                    matched += [n for n in safe_neighbors if environment.get_zone(n).zone_type == "intersection" and n not in matched]
+                
+                if matched:
+                    new_zone_id = random.choice(matched)
+                else:
+                    # random walk based on activity weight
+                    if random.random() < activity_weight:
+                        new_zone_id = random.choice(safe_neighbors)
+                    else:
+                        new_zone_id = self.zone_id
         else:
-            new_zone_id = self.zone_id  # stay put
+            # Standard random walk weighted by activity
+            if random.random() < activity_weight and safe_neighbors:
+                new_zone_id = random.choice(safe_neighbors)
+            else:
+                new_zone_id = self.zone_id
 
         # ── 5. Move ──────────────────────────────────────────────────────
         if new_zone_id != self.zone_id:
