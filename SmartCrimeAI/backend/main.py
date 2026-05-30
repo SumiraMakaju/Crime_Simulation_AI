@@ -300,7 +300,15 @@ def main() -> None:  # noqa: C901 — intentionally monolithic orchestrator
                         metric_logger.mode_counters[patrol_mode]["caught"] += new_catches
 
                 # h. Online retrain check ─────────────────────────────────
-                dataset_size = len(crime_log.events) * 3  # ~3 CSV rows per crime
+                # Determine absolute dataset size on disk to stay in sync with trainer.last_train_size
+                if os.path.exists(DATASET_CSV):
+                    try:
+                        with open(DATASET_CSV, "r", encoding="utf-8") as fh:
+                            dataset_size = sum(1 for _ in fh) - 1
+                    except Exception:
+                        dataset_size = len(crime_log.events) * 3
+                else:
+                    dataset_size = len(crime_log.events) * 3
                 if dataset_size >= ML_MIN_ROWS and trainer.should_retrain(dataset_size):
                     try:
                         X, y = load_dataset(DATASET_CSV)
