@@ -310,25 +310,36 @@ def main() -> None:  # noqa: C901 — intentionally monolithic orchestrator
                 else:
                     dataset_size = len(crime_log.events) * 3
                 if dataset_size >= ML_MIN_ROWS and trainer.should_retrain(dataset_size):
-                    try:
-                        X, y = load_dataset(DATASET_CSV)
-                        if len(X) >= ML_MIN_ROWS:
-                            eval_metrics = trainer.online_retrain(X, y)
-                            trainer.save()
-                            predictor.set_trainer(trainer)
-                            
-                            # Retrain GNN alongside Random Forest
-                            gnn_metrics = gnn_trainer.train(env)
-                            predictor.set_gnn_trainer(gnn_trainer)
-                            
-                            # Generate training reports & charts
-                            if trainer.X_test is not None and trainer.y_test is not None:
-                                ReportGenerator.generate_full_report(trainer, gnn_trainer, trainer.X_test, trainer.y_test, env.tick)
+                    if not getattr(trainer, "is_currently_retraining", False):
+                        trainer.is_currently_retraining = True
+                        print(f"  [ML] Starting background retrain thread at Tick {env.tick}...")
+                        
+                        current_tick = env.tick
+                        
+                        def bg_train_target():
+                            try:
+                                X, y = load_dataset(DATASET_CSV)
+                                if len(X) >= ML_MIN_ROWS:
+                                    eval_metrics = trainer.online_retrain(X, y)
+                                    trainer.save()
+                                    predictor.set_trainer(trainer)
+                                    
+                                    # Retrain GNN alongside Random Forest
+                                    gnn_metrics = gnn_trainer.train(env)
+                                    predictor.set_gnn_trainer(gnn_trainer)
+                                    
+                                    # Generate training reports & charts
+                                    if trainer.X_test is not None and trainer.y_test is not None:
+                                        ReportGenerator.generate_full_report(trainer, gnn_trainer, trainer.X_test, trainer.y_test, current_tick)
+                                        
+                                    metric_logger.ml_metrics = eval_metrics
+                                    print(f"  [ML] Background retrain complete at Tick {current_tick}. Metrics: {eval_metrics}")
+                            except Exception as bg_exc:
+                                print(f"  [ML] Background retrain error: {bg_exc}")
+                            finally:
+                                trainer.is_currently_retraining = False
                                 
-                            metric_logger.ml_metrics = eval_metrics
-                            print(f"  [ML] Retrained RF and GNN on {len(X)} rows. Metrics: {eval_metrics}")
-                    except Exception as exc:
-                        print(f"  [ML] Retrain error: {exc}")
+                        threading.Thread(target=bg_train_target, daemon=True).start()
 
             # Print status (outside lock)
             recent_events = crime_log.events[-20:] if crime_log.events else []
