@@ -31,7 +31,7 @@ class ReportGenerator:
         matplotlib.rcParams['font.family'] = 'sans-serif'
 
     @classmethod
-    def generate_confusion_matrix(cls, y_test, y_pred, tick, output_dir="output/reports"):
+    def generate_confusion_matrix(cls, y_test, y_pred, dataset_size, output_dir="output/reports"):
         """Generates and saves a modern confusion matrix heatmap."""
         os.makedirs(output_dir, exist_ok=True)
         cls._setup_theme()
@@ -55,7 +55,7 @@ class ReportGenerator:
         ax.set_yticklabels(['No Crime', 'Crime'], fontsize=10)
         ax.set_xlabel('Predicted Label', fontweight='bold', labelpad=10)
         ax.set_ylabel('True Label', fontweight='bold', labelpad=10)
-        ax.set_title(f'Confusion Matrix (Tick {tick})', fontsize=12, fontweight='bold', pad=15)
+        ax.set_title(f'Confusion Matrix (Database: {dataset_size} rows)', fontsize=12, fontweight='bold', pad=15)
         
         # Write text values inside cells
         thresh = cm.max() / 2.
@@ -67,13 +67,13 @@ class ReportGenerator:
                         fontsize=14, fontweight='bold')
         
         plt.tight_layout()
-        path = os.path.join(output_dir, f'confusion_matrix_{tick}.png')
+        path = os.path.join(output_dir, f'confusion_matrix_{dataset_size}.png')
         plt.savefig(path, dpi=300, facecolor='#121214')
         plt.close()
         return path
 
     @classmethod
-    def generate_roc_curve(cls, y_test, y_proba, tick, output_dir="output/reports"):
+    def generate_roc_curve(cls, y_test, y_proba, dataset_size, output_dir="output/reports"):
         """Generates and saves a styled ROC curve with AUC annotation."""
         os.makedirs(output_dir, exist_ok=True)
         cls._setup_theme()
@@ -89,17 +89,17 @@ class ReportGenerator:
         ax.set_ylim([-0.02, 1.02])
         ax.set_xlabel('False Positive Rate', fontweight='bold', labelpad=10)
         ax.set_ylabel('True Positive Rate', fontweight='bold', labelpad=10)
-        ax.set_title(f'Receiver Operating Characteristic (Tick {tick})', fontsize=12, fontweight='bold', pad=15)
+        ax.set_title(f'Receiver Operating Characteristic (Database: {dataset_size} rows)', fontsize=12, fontweight='bold', pad=15)
         ax.legend(loc="lower right", frameon=True, facecolor='#1a1a1e', edgecolor='#2c2c35')
         
         plt.tight_layout()
-        path = os.path.join(output_dir, f'roc_curve_{tick}.png')
+        path = os.path.join(output_dir, f'roc_curve_{dataset_size}.png')
         plt.savefig(path, dpi=300, facecolor='#121214')
         plt.close()
         return path
 
     @classmethod
-    def generate_pr_curve(cls, y_test, y_proba, tick, output_dir="output/reports"):
+    def generate_pr_curve(cls, y_test, y_proba, dataset_size, output_dir="output/reports"):
         """Generates and saves a styled Precision-Recall curve."""
         os.makedirs(output_dir, exist_ok=True)
         cls._setup_theme()
@@ -114,17 +114,17 @@ class ReportGenerator:
         ax.set_ylim([-0.02, 1.02])
         ax.set_xlabel('Recall', fontweight='bold', labelpad=10)
         ax.set_ylabel('Precision', fontweight='bold', labelpad=10)
-        ax.set_title(f'Precision-Recall Curve (Tick {tick})', fontsize=12, fontweight='bold', pad=15)
+        ax.set_title(f'Precision-Recall Curve (Database: {dataset_size} rows)', fontsize=12, fontweight='bold', pad=15)
         ax.legend(loc="lower left", frameon=True, facecolor='#1a1a1e', edgecolor='#2c2c35')
         
         plt.tight_layout()
-        path = os.path.join(output_dir, f'pr_curve_{tick}.png')
+        path = os.path.join(output_dir, f'pr_curve_{dataset_size}.png')
         plt.savefig(path, dpi=300, facecolor='#121214')
         plt.close()
         return path
 
     @classmethod
-    def generate_feature_importance(cls, feature_names, importances, tick, output_dir="output/reports"):
+    def generate_feature_importance(cls, feature_names, importances, dataset_size, output_dir="output/reports"):
         """Generates and saves a feature importance horizontal bar chart."""
         os.makedirs(output_dir, exist_ok=True)
         cls._setup_theme()
@@ -142,7 +142,7 @@ class ReportGenerator:
         ax.set_yticks(range(len(indices)))
         ax.set_yticklabels([feature_names[i] for i in indices], fontweight='bold')
         ax.set_xlabel('Relative Importance', fontweight='bold', labelpad=10)
-        ax.set_title(f'Random Forest Feature Importance (Tick {tick})', fontsize=12, fontweight='bold', pad=15)
+        ax.set_title(f'Random Forest Feature Importance (Database: {dataset_size} rows)', fontsize=12, fontweight='bold', pad=15)
         
         # Annotate actual values on the bars
         for bar in bars:
@@ -153,13 +153,13 @@ class ReportGenerator:
         ax.set_xlim([0, max(importances) * 1.15])
         
         plt.tight_layout()
-        path = os.path.join(output_dir, f'feature_importance_{tick}.png')
+        path = os.path.join(output_dir, f'feature_importance_{dataset_size}.png')
         plt.savefig(path, dpi=300, facecolor='#121214')
         plt.close()
         return path
 
     @classmethod
-    def generate_model_comparison(cls, rf_metrics, gnn_metrics, tick, output_dir="output/reports"):
+    def generate_model_comparison(cls, rf_metrics, gnn_metrics, dataset_size, output_dir="output/reports"):
         """Generates and saves a model comparison bar chart between RF and GNN."""
         os.makedirs(output_dir, exist_ok=True)
         cls._setup_theme()
@@ -176,7 +176,7 @@ class ReportGenerator:
         rects2 = ax.bar(x + width/2, gnn_vals, width, label='Graph Neural Network (Spatio-Temporal)', color='#8b5cf6', edgecolor='#2c2c35')
         
         ax.set_ylabel('Scores', fontweight='bold', labelpad=10)
-        ax.set_title(f'Model Comparison: RF vs GNN (Tick {tick})', fontsize=12, fontweight='bold', pad=15)
+        ax.set_title(f'Model Comparison: RF vs GNN (Database: {dataset_size} rows)', fontsize=12, fontweight='bold', pad=15)
         ax.set_xticks(x)
         ax.set_xticklabels([m.upper().replace('_', ' ') for m in metrics], fontweight='bold')
         ax.set_ylim([0, 1.15])
@@ -196,7 +196,7 @@ class ReportGenerator:
         autolabel(rects2)
         
         plt.tight_layout()
-        path = os.path.join(output_dir, f'model_comparison_{tick}.png')
+        path = os.path.join(output_dir, f'model_comparison_{dataset_size}.png')
         plt.savefig(path, dpi=300, facecolor='#121214')
         plt.close()
         return path
@@ -234,51 +234,51 @@ class ReportGenerator:
         latest_report = {
             **record,
             "charts": {
-                "confusion_matrix": f"/reports/confusion_matrix_{tick}.png",
-                "roc_curve": f"/reports/roc_curve_{tick}.png",
-                "pr_curve": f"/reports/pr_curve_{tick}.png",
-                "feature_importance": f"/reports/feature_importance_{tick}.png",
-                "model_comparison": f"/reports/model_comparison_{tick}.png"
+                "confusion_matrix": f"/reports/confusion_matrix_{dataset_size}.png",
+                "roc_curve": f"/reports/roc_curve_{dataset_size}.png",
+                "pr_curve": f"/reports/pr_curve_{dataset_size}.png",
+                "feature_importance": f"/reports/feature_importance_{dataset_size}.png",
+                "model_comparison": f"/reports/model_comparison_{dataset_size}.png"
             }
         }
         with open(latest_path, 'w') as f:
             json.dump(latest_report, f, indent=2)
             
-        print(f"[ReportGenerator] Saved training history and latest report for tick {tick}.")
+        print(f"[ReportGenerator] Saved training history and latest report for dataset size {dataset_size}.")
 
     @classmethod
-    def generate_full_report(cls, trainer, gnn_trainer, X_test, y_test, tick):
+    def generate_full_report(cls, trainer, gnn_trainer, X_test, y_test, tick, dataset_size):
         """Generates all charts, comparisons, and history updates in one call."""
         try:
-            print(f"[ReportGenerator] Starting full report generation for tick {tick}...")
+            print(f"[ReportGenerator] Starting full report generation for database size {dataset_size}...")
             
             # Predict probabilities and classes
             y_pred_rf = trainer.classifier.predict(X_test)
             y_proba_rf = trainer.classifier.predict_proba(X_test)[:, 1]
             
             # Generate primary RF plots
-            cls.generate_confusion_matrix(y_test, y_pred_rf, tick)
-            cls.generate_roc_curve(y_test, y_proba_rf, tick)
-            cls.generate_pr_curve(y_test, y_proba_rf, tick)
+            cls.generate_confusion_matrix(y_test, y_pred_rf, dataset_size)
+            cls.generate_roc_curve(y_test, y_proba_rf, dataset_size)
+            cls.generate_pr_curve(y_test, y_proba_rf, dataset_size)
             
             # Feature importance
             feature_names = list(X_test.columns)
             importances = trainer.classifier.feature_importances_
-            cls.generate_feature_importance(feature_names, importances, tick)
+            cls.generate_feature_importance(feature_names, importances, dataset_size)
             
             # GNN metrics
             gnn_metrics = {}
             if gnn_trainer and gnn_trainer.is_trained:
                 gnn_metrics = gnn_trainer.eval_metrics
                 # Generate comparison plot
-                cls.generate_model_comparison(trainer.eval_metrics, gnn_metrics, tick)
+                cls.generate_model_comparison(trainer.eval_metrics, gnn_metrics, dataset_size)
             else:
                 # If no GNN, compare GNN as zero metrics
                 gnn_metrics = {"precision": 0.0, "recall": 0.0, "f1": 0.0, "roc_auc": 0.0}
-                cls.generate_model_comparison(trainer.eval_metrics, gnn_metrics, tick)
+                cls.generate_model_comparison(trainer.eval_metrics, gnn_metrics, dataset_size)
                 
             # Append history
-            cls.append_training_history(tick, len(X_test) * 5, trainer.eval_metrics, gnn_metrics)
+            cls.append_training_history(tick, dataset_size, trainer.eval_metrics, gnn_metrics)
             print("[ReportGenerator] Successfully generated all charts and report metrics!")
             
         except Exception as e:
