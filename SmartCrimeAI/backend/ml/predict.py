@@ -3,7 +3,7 @@
 import numpy as np
 import pandas as pd
 
-from config import HOTSPOT_RISK_THRESHOLD, MODEL_PATH, GNN_ENSEMBLE_WEIGHT
+from config import HOTSPOT_RISK_THRESHOLD, MODEL_PATH
 from ml.dataset import FeatureExtractor
 from ml.train_model import ModelTrainer
 from ml.gnn_model import GNNTrainer
@@ -88,7 +88,7 @@ class CrimePredictor:
         columns = self.extractor.feature_columns()
         results: dict = {}
 
-        # GNN predictions if available
+        # GNN hotspot predictions if available (separate from RF ensemble)
         gnn_preds = {}
         if self.gnn_trainer and self.gnn_trainer.is_trained:
             try:
@@ -107,19 +107,24 @@ class CrimePredictor:
             # predict_proba returns shape (1, n_classes); class-1 is last col
             rf_score = float(proba[0, -1])
 
-            # Ensemble with GNN if available
-            if zone.zone_id in gnn_preds:
-                risk_score = (1 - GNN_ENSEMBLE_WEIGHT) * rf_score + GNN_ENSEMBLE_WEIGHT * gnn_preds[zone.zone_id]
-            else:
-                risk_score = rf_score
+            # Risk score is 100% RF (GNN is used separately for hotspot prediction)
+            risk_score = rf_score
 
             # Time-until-crime proxy from the Ridge regressor
             raw_window = self.trainer.regressor.predict(row)[0]
             predicted_window = int(np.clip(raw_window, 1, 100))
 
+            # Store GNN hotspot probability on zone for patrol routing
+            gnn_hotspot_prob = gnn_preds.get(zone.zone_id, 0.0)
+            zone.gnn_hotspot_prob = gnn_hotspot_prob
+
+            # is_hotspot considers both RF risk AND GNN spatial prediction
+            rf_hotspot = risk_score > HOTSPOT_RISK_THRESHOLD
+            gnn_hotspot = gnn_hotspot_prob > 0.5
+
             results[zone.zone_id] = {
                 "risk_score": float(risk_score),
-                "is_hotspot": bool(risk_score > HOTSPOT_RISK_THRESHOLD),
+                "is_hotspot": bool(rf_hotspot or gnn_hotspot),
                 "predicted_crime_window": predicted_window,
             }
 

@@ -142,10 +142,10 @@ def main() -> None:  # noqa: C901 — intentionally monolithic orchestrator
         print("[INIT] Centralized RL patrol policy loaded from disk.")
     else:
         print("[INIT] ⚠  No saved Centralized RL policy found! Automatically training fresh policy on startup...")
-        # Temp list of agents to configure observation spaces
-        temp_police = [PoliceAgent(f"train_pol_{i}", "A0", 0, 0) for i in range(4)]
-        temp_civs = [CivilianAgent(f"train_civ_{i}", "A0", 0, 0) for i in range(30)]
-        temp_crims = [CriminalAgent(f"train_crim_{i}", "A0", 0, 0) for i in range(5)]
+        # Temp list of agents to configure observation spaces (must match actual counts)
+        temp_police = [PoliceAgent(f"train_pol_{i}", "A0", 0, 0) for i in range(DEFAULT_POLICE_COUNT)]
+        temp_civs = [CivilianAgent(f"train_civ_{i}", "A0", 0, 0) for i in range(DEFAULT_CIVILIAN_COUNT)]
+        temp_crims = [CriminalAgent(f"train_crim_{i}", "A0", 0, 0) for i in range(DEFAULT_CRIMINAL_COUNT)]
         temp_crime_log = CrimeLog()
         try:
             rl_agent.train(env, temp_police, temp_civs, temp_crims, temp_crime_log)
@@ -158,9 +158,9 @@ def main() -> None:  # noqa: C901 — intentionally monolithic orchestrator
         print("[INIT] MARL police coordination policy loaded from disk.")
     else:
         print("[INIT] ⚠  No saved MARL policy found! Automatically training fresh MARL policy on startup...")
-        temp_police = [PoliceAgent(f"train_pol_{i}", "A0", 0, 0) for i in range(4)]
-        temp_civs = [CivilianAgent(f"train_civ_{i}", "A0", 0, 0) for i in range(30)]
-        temp_crims = [CriminalAgent(f"train_crim_{i}", "A0", 0, 0) for i in range(5)]
+        temp_police = [PoliceAgent(f"train_pol_{i}", "A0", 0, 0) for i in range(DEFAULT_POLICE_COUNT)]
+        temp_civs = [CivilianAgent(f"train_civ_{i}", "A0", 0, 0) for i in range(DEFAULT_CIVILIAN_COUNT)]
+        temp_crims = [CriminalAgent(f"train_crim_{i}", "A0", 0, 0) for i in range(DEFAULT_CRIMINAL_COUNT)]
         temp_crime_log = CrimeLog()
         try:
             marl_coordinator.train(env, temp_police, temp_civs, temp_crims, temp_crime_log)

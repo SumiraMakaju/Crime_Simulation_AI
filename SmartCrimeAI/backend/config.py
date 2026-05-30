@@ -17,7 +17,7 @@ START_HOUR = 8.0                  # simulation starts at 8:00 AM
 # ─── Agent Counts (defaults) ──────────────────────────────────────────────────
 DEFAULT_CIVILIAN_COUNT = 30
 DEFAULT_CRIMINAL_COUNT = 5
-DEFAULT_POLICE_COUNT = 4
+DEFAULT_POLICE_COUNT = 10
 
 # ─── Zone Type Distribution ───────────────────────────────────────────────────
 ZONE_TYPE_WEIGHTS = {
@@ -101,11 +101,13 @@ COMMUTE_EVENING_END = 20.0
 SCHEDULE_BIAS_STRENGTH = 0.7       # probability of following schedule vs random walk
 
 # ─── Graph Neural Network (GNN) ────────────────────────────────────────────────
-GNN_HIDDEN_DIM = 32
+GNN_HIDDEN_DIM = 64
 GNN_EPOCHS = 50
 GNN_LR = 0.001
 GNN_MODEL_PATH = "output/gnn_model.pt"
-GNN_ENSEMBLE_WEIGHT = 0.6          # Weight of GNN predictions (RF weight will be 0.4)
+GNN_ENSEMBLE_WEIGHT = 0.0          # GNN disabled in ensemble (RF-only) — GNN still trains for academic comparison
+GNN_HOTSPOT_WINDOW = 12            # ticks per prediction window (1 simulated hour)
+GNN_HOTSPOT_TOP_PERCENT = 0.20     # top 20% zones by crime count = hotspot
 
 # ─── Multi-Agent Reinforcement Learning (MARL) ─────────────────────────────────
 MARL_TOTAL_TIMESTEPS = 8000

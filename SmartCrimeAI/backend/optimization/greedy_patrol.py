@@ -63,9 +63,13 @@ class GreedyPatrolOptimizer:
 
     @staticmethod
     def _get_sorted_zones(environment: Any) -> List[Any]:
-        """Return all zones sorted by *risk_score* descending."""
+        """Return all zones sorted by composite score (RF risk + GNN hotspot) descending."""
         zones = [environment.get_zone(zid) for zid in environment.zone_ids]
-        zones.sort(key=lambda z: z.risk_score, reverse=True)
+        # Composite: 70% RF risk_score + 30% GNN hotspot probability
+        zones.sort(
+            key=lambda z: 0.7 * z.risk_score + 0.3 * getattr(z, 'gnn_hotspot_prob', 0.0),
+            reverse=True
+        )
         return zones
 
     def _build_route(

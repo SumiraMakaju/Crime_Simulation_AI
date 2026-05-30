@@ -173,7 +173,7 @@ class ReportGenerator:
         
         fig, ax = plt.subplots(figsize=(8, 5.5))
         rects1 = ax.bar(x - width/2, rf_vals, width, label='Random Forest (Tabular)', color='#3b82f6', edgecolor='#2c2c35')
-        rects2 = ax.bar(x + width/2, gnn_vals, width, label='Graph Neural Network (Spatio-Temporal)', color='#8b5cf6', edgecolor='#2c2c35')
+        rects2 = ax.bar(x + width/2, gnn_vals, width, label='Graph Neural Network (Spatial Hotspot)', color='#8b5cf6', edgecolor='#2c2c35')
         
         ax.set_ylabel('Scores', fontweight='bold', labelpad=10)
         ax.set_title(f'Model Comparison: RF vs GNN (Database: {dataset_size} rows)', fontsize=12, fontweight='bold', pad=15)
