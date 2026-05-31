@@ -226,6 +226,7 @@ class CriminalAgent:
         self.x, self.z = _random_pos_in_zone(zone_col, zone_row)
         self.state: str = "scouting"
         self.lay_low_timer: int = 0
+        self.commit_timer: int = 0
         self.hot_zones: Set[str] = set()
         self.safe_zones: Set[str] = set()
         self.caught_count: int = 0
@@ -278,7 +279,31 @@ class CriminalAgent:
             self.state = "laying_low"
             return None
 
-        zone = environment.get_zone(self.zone_id)
+        # ── 1b. Committing crime (duration lock) ─────────────────────────
+        if self.commit_timer > 0:
+            # Check if police arrived in our zone while we were committing!
+            zone = environment.get_zone(self.zone_id)
+            if zone.police_count > 0:
+                self.commit_timer = 0
+                self.lay_low_timer = MAX_CRIMINAL_LAY_LOW
+                self.state = "laying_low"
+                self.caught_count = getattr(self, "caught_count", 0) + 1
+                if not hasattr(self, "hot_zones"):
+                    self.hot_zones = set()
+                self.hot_zones.add(self.zone_id)
+                
+                # Also find the active crime event in crime_log and mark it caught!
+                for event in reversed(crime_log.events):
+                    if event.zone_id == self.zone_id and not event.caught:
+                        crime_log.mark_caught(event.crime_id, environment.tick - event.tick)
+                        break
+                return None
+
+            self.commit_timer -= 1
+            self.state = "committing"
+            return None
+
+        zone = environment.get_zone(self.zone_id);
 
         # ── 2. Police presence → flee ────────────────────────────────────
         police_nearby = zone.police_count > 0 or any(
@@ -375,6 +400,7 @@ class CriminalAgent:
         # Persist
         crime_log.append(event, environment)
         self.state = "committing"
+        self.commit_timer = 3
         return event
 
     # ------------------------------------------------------------------ #
