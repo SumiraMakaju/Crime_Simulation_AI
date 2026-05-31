@@ -7,7 +7,7 @@ No magic numbers should appear in any other module.
 # ─── Grid Layout ───────────────────────────────────────────────────────────────
 GRID_ROWS = 6
 GRID_COLS = 6
-ZONE_SIZE_UNITS = 10  # Unity world units per zone side
+ZONE_SIZE_UNITS = 30  # Unity world units per zone side (increased from 10 to disperse agents)
 
 # ─── Simulation Timing ────────────────────────────────────────────────────────
 TICKS_PER_HOUR = 12               # 1 tick = 5 simulated minutes
