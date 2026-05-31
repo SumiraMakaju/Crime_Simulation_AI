@@ -128,7 +128,7 @@ If you perform a fresh install or checkout without an existing `output` folder, 
 To skip this initial startup training delay and bypass the time required to accumulate historical crime logs, you can drop in a pre-trained `output` directory:
 
 1. Download the pre-trained `output` directory from Google Drive:
-   * **[Google Drive link placeholder for pre-trained output folder]**
+   * **https://drive.google.com/drive/folders/1tBnVMCuChfsWKNJ2VD65Kf6UGlPxEpxj?usp=sharing**
 2. Extract the downloaded folder.
 3. Place the `output` directory directly inside the `SmartCrimeAI/backend/` folder (replacing any empty `output` folder).
 4. Run the Python backend:
