@@ -64,7 +64,6 @@ jobs:
         with:
           projectPath: SmartCrimeAI/crimesimfrontend
           targetPlatform: StandaloneWindows64
-          buildMethod: UnityEditor.BuildPlayerWindow.BuildPlayer
           buildName: SmartCrimeAI-Game
 
       - name: Upload Frontend Artifact
