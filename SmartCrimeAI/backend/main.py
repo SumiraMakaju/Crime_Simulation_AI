@@ -195,6 +195,16 @@ def main() -> None:  # noqa: C901 — intentionally monolithic orchestrator
     print(f"[INIT] API server started at http://localhost:{API_PORT}")
     print(f"[INIT] API docs at http://localhost:{API_PORT}/docs")
 
+    # Count initial dataset size once at startup to avoid expensive synchronous disk reads inside the lock
+    initial_dataset_size = 0
+    if os.path.exists(DATASET_CSV):
+        try:
+            with open(DATASET_CSV, "r", encoding="utf-8") as fh:
+                initial_dataset_size = sum(1 for _ in fh) - 1
+            print(f"[INIT] Existing dataset loaded. Initial size: {initial_dataset_size} rows.")
+        except Exception as exc:
+            print(f"[INIT] Could not count CSV lines on startup: {exc}")
+
     # ── 7. Main simulation loop ──────────────────────────────────────────
     try:
         while True:
@@ -300,15 +310,8 @@ def main() -> None:  # noqa: C901 — intentionally monolithic orchestrator
                         metric_logger.mode_counters[patrol_mode]["caught"] += new_catches
 
                 # h. Online retrain check ─────────────────────────────────
-                # Determine absolute dataset size on disk to stay in sync with trainer.last_train_size
-                if os.path.exists(DATASET_CSV):
-                    try:
-                        with open(DATASET_CSV, "r", encoding="utf-8") as fh:
-                            dataset_size = sum(1 for _ in fh) - 1
-                    except Exception:
-                        dataset_size = len(crime_log.events) * 3
-                else:
-                    dataset_size = len(crime_log.events) * 3
+                # Track dataset size in memory to prevent expensive synchronous disk reads inside the lock
+                dataset_size = initial_dataset_size + (len(crime_log.events) * 3)
                 if dataset_size >= ML_MIN_ROWS and trainer.should_retrain(dataset_size):
                     if not getattr(trainer, "is_currently_retraining", False):
                         trainer.is_currently_retraining = True
