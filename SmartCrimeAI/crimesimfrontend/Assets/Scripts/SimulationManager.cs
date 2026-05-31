@@ -55,6 +55,7 @@ public class SimulationManager : MonoBehaviour
         if (patrolLineRenderer == null) { patrolLineRenderer = FindObjectOfType<PatrolLineRenderer>(); if (patrolLineRenderer != null) Debug.Log($"[SimulationManager] Auto-healed unassigned patrolLineRenderer to: {patrolLineRenderer.gameObject.name}"); }
 
         ValidateReferences();
+        StartBackendProcess();
         StartCoroutine(Startup());
     }
  
@@ -260,5 +261,59 @@ public class SimulationManager : MonoBehaviour
     void OnDestroy()
     {
         _isRunning = false;
+        StopBackendProcess();
+    }
+
+    private System.Diagnostics.Process _backendProcess;
+
+    private void StartBackendProcess()
+    {
+        // Path to the backend executable in the same directory as the game launcher
+        string backendPath = System.IO.Path.Combine(Application.dataPath, "../SmartCrimeAI-Backend.exe");
+        
+        // Fallback for editor testing or alternative build structures
+        if (!System.IO.File.Exists(backendPath))
+        {
+            backendPath = System.IO.Path.Combine(Application.streamingAssetsPath, "SmartCrimeAI-Backend.exe");
+        }
+
+        if (System.IO.File.Exists(backendPath))
+        {
+            Debug.Log($"[SimulationManager] Found standalone backend at: {backendPath}. Launching background server process...");
+            try
+            {
+                _backendProcess = new System.Diagnostics.Process();
+                _backendProcess.StartInfo.FileName = backendPath;
+                _backendProcess.StartInfo.CreateNoWindow = true; // Run silently in the background with no separate CMD popup
+                _backendProcess.StartInfo.UseShellExecute = false;
+                _backendProcess.Start();
+                Debug.Log("[SimulationManager] Background backend process successfully spawned.");
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogError($"[SimulationManager] Failed to launch background server process: {ex.Message}");
+            }
+        }
+        else
+        {
+            Debug.LogWarning("[SimulationManager] Standalone backend executable not found at game root directory. Assuming external server is already running.");
+        }
+    }
+
+    private void StopBackendProcess()
+    {
+        if (_backendProcess != null && !_backendProcess.HasExited)
+        {
+            try
+            {
+                _backendProcess.Kill();
+                _backendProcess.Dispose();
+                Debug.Log("[SimulationManager] Background backend process successfully terminated.");
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogWarning($"[SimulationManager] Error clean terminating backend process: {ex.Message}");
+            }
+        }
     }
 }

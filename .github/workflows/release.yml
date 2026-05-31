@@ -1,0 +1,115 @@
+name: Build and Release SmartCrimeAI
+
+on:
+  push:
+    tags:
+      - 'v*' # Triggers on new tag pushes like v1.0.0, v2.1.0, etc.
+
+jobs:
+  # --- JOB 1: Build Backend Standalone Executable ---
+  build-backend:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r SmartCrimeAI/backend/requirements.txt
+          pip install pyinstaller
+
+      - name: Build Standalone Exe with PyInstaller
+        run: |
+          # Compiles the backend into a single standalone Windows Executable
+          pyinstaller --onefile --name="SmartCrimeAI-Backend" --workpath="build" --distpath="dist" SmartCrimeAI/backend/main.py
+        shell: pwsh
+
+      - name: Upload Backend Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SmartCrimeAI-Backend
+          path: dist/SmartCrimeAI-Backend.exe
+
+  # --- JOB 2: Build Unity Frontend using GameCI ---
+  build-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          lfs: true # Restores large assets via Git LFS if used
+
+      - name: Cache Unity Library folder
+        uses: actions/cache@v4
+        with:
+          path: SmartCrimeAI/crimesimfrontend/Library
+          key: Library-crimesimfrontend-StandaloneWindows64
+          restore-keys: |
+            Library-crimesimfrontend-
+
+      - name: Build Unity Player (Windows 64-bit)
+        uses: game-ci/unity-builder@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+        with:
+          projectPath: SmartCrimeAI/crimesimfrontend
+          targetPlatform: StandaloneWindows64
+          buildMethod: UnityEditor.BuildPlayerWindow.BuildPlayer
+          buildName: SmartCrimeAI-Game
+
+      - name: Upload Frontend Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SmartCrimeAI-Frontend-Raw
+          path: build/StandaloneWindows64/
+
+  # --- JOB 3: Combine, Package, and Publish Release ---
+  publish-release:
+    needs: [build-backend, build-frontend]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Create Work Directory
+        run: mkdir -p release-workspace
+
+      - name: Download Backend Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: SmartCrimeAI-Backend
+          path: release-workspace/backend-bin
+
+      - name: Download Frontend Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: SmartCrimeAI-Frontend-Raw
+          path: release-workspace/SmartCrimeAI-Release
+
+      - name: Package Standalone Backend inside Unity Build Folder
+        run: |
+          # Moves the backend executable directly next to SmartCrimeAI-Game.exe
+          mv release-workspace/backend-bin/SmartCrimeAI-Backend.exe release-workspace/SmartCrimeAI-Release/
+          
+          # Verify files inside packaging workspace
+          ls -la release-workspace/SmartCrimeAI-Release/
+
+      - name: Zip the Combined Single-Click Release Folder
+        run: |
+          cd release-workspace
+          zip -r ../SmartCrimeAI-Unified-Release.zip SmartCrimeAI-Release/
+
+      - name: Create GitHub Release and Upload Combined Asset
+        uses: softprops/action-gh-release@v2
+        with:
+          files: SmartCrimeAI-Unified-Release.zip
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

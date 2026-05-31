@@ -7,3 +7,6 @@ pandas
 numpy
 joblib
 matplotlib
+torch
+aiofiles
+pyinstaller
