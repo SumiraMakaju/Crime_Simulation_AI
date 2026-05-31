@@ -28,7 +28,7 @@ jobs:
       - name: Build Standalone Exe with PyInstaller
         run: |
           # Compiles the backend into a single standalone Windows Executable
-          pyinstaller --onefile --name="SmartCrimeAI-Backend" --workpath="build" --distpath="dist" SmartCrimeAI/backend/main.py
+          pyinstaller --onefile --name="SmartCrimeAI-Backend" --collect-data stable_baselines3 --workpath="build" --distpath="dist" SmartCrimeAI/backend/main.py
         shell: pwsh
 
       - name: Upload Backend Artifact
