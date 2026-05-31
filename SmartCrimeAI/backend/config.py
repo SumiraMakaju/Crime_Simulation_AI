@@ -11,7 +11,7 @@ ZONE_SIZE_UNITS = 10  # Unity world units per zone side
 
 # ─── Simulation Timing ────────────────────────────────────────────────────────
 TICKS_PER_HOUR = 12               # 1 tick = 5 simulated minutes
-SIMULATION_TICK_SLEEP = 1.5       # seconds of real time per tick (slower, human-readable pace)
+SIMULATION_TICK_SLEEP = 3.0       # seconds of real time per tick (slower, human-readable pace)
 START_HOUR = 8.0                  # simulation starts at 8:00 AM
 
 # ─── Agent Counts (defaults) ──────────────────────────────────────────────────

@@ -1,4 +1,4 @@
-﻿// CityBuilder.cs
+// CityBuilder.cs
 // Reads zone_config.json written by the Python backend and spawns
 // the correct zone prefab at each world position.
 
@@ -138,7 +138,7 @@ public class CityBuilder : MonoBehaviour
 
     private void BakeNavMesh()
     {
-        var surface = FindFirstObjectByType<Unity.AI.Navigation.NavMeshSurface>();
+        var surface = FindObjectOfType<Unity.AI.Navigation.NavMeshSurface>();
         if (surface != null)
         {
             surface.BuildNavMesh();

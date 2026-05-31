@@ -58,6 +58,7 @@ public class CrimeEventData
 {
     public string id;           // uuid hex string, unique per event
     public string zone;         // zone where crime occurred, e.g. "B2"
+    public int tick;            // simulation tick when it occurred
     public float time_of_day;   // simulation hour when it happened
     public string type;         // "theft" | "assault" | "vandalism" | "burglary"
     public bool caught;         // true = police intercepted it

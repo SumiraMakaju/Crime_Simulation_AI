@@ -44,9 +44,20 @@ public class AgentBadge : MonoBehaviour
         // Billboard  always face camera
         if (_cam != null)
             transform.forward = _cam.transform.forward;
+
+        // If crime is in progress, pulse the badge scale dramatically to stand out!
+        if (_tmp != null && _tmp.text.Contains("CRIME IN PROGRESS"))
+        {
+            float pulse = 0.5f + Mathf.Sin(Time.time * 8f) * 0.15f;
+            transform.localScale = Vector3.one * pulse;
+        }
+        else
+        {
+            transform.localScale = Vector3.one * 0.5f;
+        }
     }
 
-    public void SetState(string agentType, string state)
+    public void SetState(string agentType, string state, Color uniqueColor = default, string agentId = "")
     {
         if (_tmp == null) return;
 
@@ -56,8 +67,8 @@ public class AgentBadge : MonoBehaviour
                 switch (state)
                 {
                     case "committing":
-                        _tmp.text = "CRIME IN PROGRESS";
-                        _tmp.color = new Color(1f, 0.2f, 0.2f);
+                        _tmp.text = "[CRIME IN PROGRESS]";
+                        _tmp.color = new Color(1f, 0.05f, 0.05f);
                         break;
                     case "fleeing":
                         _tmp.text = "FLEEING";
@@ -74,14 +85,17 @@ public class AgentBadge : MonoBehaviour
                 break;
 
             case "police":
+                Color pColor = uniqueColor != default ? uniqueColor : new Color(0.2f, 0.6f, 1f);
+                string pIdLabel = !string.IsNullOrEmpty(agentId) ? $" ({agentId})" : "";
                 switch (state)
                 {
                     case "responding":
-                        _tmp.text = "RESPONDING";
-                        _tmp.color = new Color(0.2f, 0.6f, 1f);
+                        _tmp.text = $"RESPONDING{pIdLabel}";
+                        _tmp.color = pColor;
                         break;
                     default:
-                        _tmp.text = "";
+                        _tmp.text = $"PATROL{pIdLabel}";
+                        _tmp.color = pColor;
                         break;
                 }
                 break;

@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.AI;
@@ -14,9 +14,9 @@ public class AgentController : MonoBehaviour
     public Transform agentsParent;
 
     [Header("Movement")]
-    [Tooltip("Must match backend SIMULATION_TICK_SLEEP = 0.5")]
-    public float tickRate = 0.5f;
-    public float moveSpeed = 12f;
+    [Tooltip("Must match backend SIMULATION_TICK_SLEEP = 3.0")]
+    public float tickRate = 3.0f;
+    public float moveSpeed = 3.5f;
 
     //  Internal 
     private Dictionary<string, GameObject> _agentObjects = new();
@@ -27,6 +27,7 @@ public class AgentController : MonoBehaviour
     private Dictionary<string, string> _agentTypes = new();
     private Dictionary<string, Vector3> _targetPositions = new();
     private Dictionary<string, AgentBadge> _badges = new();
+    private Dictionary<string, GameObject> _crimeLights = new();
 
     // Arrest animation lock — prevent movement during arrest
     private HashSet<string> _arrestLocked = new();
@@ -153,20 +154,62 @@ public class AgentController : MonoBehaviour
         string prevState = _previousStates.GetValueOrDefault(data.id, "");
         string agentType = _agentTypes.GetValueOrDefault(data.id, data.type);
 
-     
         if (_animators.TryGetValue(data.id, out var anim))
             anim.SetState(data.state);
 
+        // Fetch the unique patrol route color for this police officer to link them visually
+        Color pColor = Color.white;
+        bool hasUniqueColor = false;
+        var lr = FindObjectOfType<PatrolLineRenderer>();
+        if (lr != null && agentType == "police")
+        {
+            pColor = lr.GetPoliceColor(data.id);
+            hasUniqueColor = true;
+        }
 
         if (_badges.TryGetValue(data.id, out var badge))
-            badge.SetState(agentType, data.state);
+        {
+            if (agentType == "police")
+                badge.SetState(agentType, data.state, pColor, data.id);
+            else
+                badge.SetState(agentType, data.state);
+        }
+
+        if (agentType == "police" && hasUniqueColor)
+        {
+            TintAgent(data.id, pColor);
+        }
 
   
         if (agentType == "criminal")
         {
+            // Cleanup crime light if they stop committing
+            if (data.state != "committing" && _crimeLights.TryGetValue(data.id, out var clGo))
+            {
+                if (clGo != null) Destroy(clGo);
+                _crimeLights.Remove(data.id);
+            }
+
             // Started committing
             if (data.state == "committing" && prevState != "committing")
-                TintAgent(data.id, new Color(1f, 0.1f, 0.1f));
+            {
+                TintAgent(data.id, new Color(1f, 0.15f, 0.15f));
+                if (_agentObjects.TryGetValue(data.id, out var cGo) && cGo != null)
+                {
+                    cGo.transform.localScale = Vector3.one * 1.25f; // Scale up dynamically to make them highly visible!
+
+                    // Spawn a flashing neon red highlight spotlight under the criminal
+                    var lightGo = new GameObject("CrimeHighlightLight");
+                    lightGo.transform.SetParent(cGo.transform, false);
+                    lightGo.transform.localPosition = new Vector3(0f, 1.5f, 0f);
+                    var cl = lightGo.AddComponent<Light>();
+                    cl.type = LightType.Point;
+                    cl.color = new Color(1f, 0.05f, 0.05f);
+                    cl.intensity = 12f;
+                    cl.range = 10f;
+                    _crimeLights[data.id] = lightGo;
+                }
+            }
 
             // Got caught — was committing/fleeing, now laying_low
             if ((prevState == "committing" || prevState == "fleeing")
@@ -175,12 +218,24 @@ public class AgentController : MonoBehaviour
                 StartCoroutine(PlayArrestAnimation(data.id));
             }
 
-            // Back to scouting — restore color
+            // Back to scouting — restore color and scale
             if (data.state == "scouting")
+            {
                 TintAgent(data.id, new Color(0.17f, 0.17f, 0.17f));
+                if (_agentObjects.TryGetValue(data.id, out var cGo) && cGo != null)
+                {
+                    cGo.transform.localScale = Vector3.one * 0.5f; // Restore normal scale
+                }
+            }
 
             if (data.state == "fleeing")
+            {
                 TintAgent(data.id, new Color(1f, 0.5f, 0f));
+                if (_agentObjects.TryGetValue(data.id, out var cGo) && cGo != null)
+                {
+                    cGo.transform.localScale = Vector3.one * 0.5f; // Restore normal scale
+                }
+            }
         }
 
         
@@ -206,6 +261,12 @@ public class AgentController : MonoBehaviour
 
     private IEnumerator PlayArrestAnimation(string id)
     {
+        if (_crimeLights.TryGetValue(id, out var clGo))
+        {
+            if (clGo != null) Destroy(clGo);
+            _crimeLights.Remove(id);
+        }
+
         if (!_agentObjects.TryGetValue(id, out var go)) yield break;
 
         // Lock movement during arrest
@@ -290,11 +351,16 @@ public class AgentController : MonoBehaviour
 
     private void TintAgent(string id, Color color)
     {
-        if (!_agentObjects.TryGetValue(id, out var go)) return;
+        if (!_agentObjects.TryGetValue(id, out var go) || go == null) return;
         foreach (var r in go.GetComponentsInChildren<Renderer>())
         {
-            if (r.material.shader.name.Contains("TextMeshPro")) continue;
-            r.material.color = color;
+            if (r == null || r.sharedMaterial == null || r.sharedMaterial.shader == null) continue;
+            if (r.sharedMaterial.shader.name.Contains("TextMeshPro")) continue;
+            
+            if (r.material != null)
+            {
+                r.material.color = color;
+            }
         }
     }
 
@@ -302,6 +368,12 @@ public class AgentController : MonoBehaviour
     private void DespawnAgent(string id)
     {
         if (_arrestLocked.Contains(id)) return; // let arrest animation finish
+
+        if (_crimeLights.TryGetValue(id, out var clGo))
+        {
+            if (clGo != null) Destroy(clGo);
+            _crimeLights.Remove(id);
+        }
 
         if (_agentObjects.TryGetValue(id, out var go) && go != null)
         {

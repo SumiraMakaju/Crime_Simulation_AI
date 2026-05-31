@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using TMPro;
@@ -19,16 +19,16 @@ public class SimulationManager : MonoBehaviour
     [Header("UI")]
     public DashboardController dashboardController;
 
-    public void SetPatrolModeMARL() { if (apiClient) apiClient.SetPatrolModeMARL(); }
-    public void TriggerBlackout() { if (apiClient) apiClient.TriggerBlackout(); }
-    public void TriggerSaturation() { if (apiClient) apiClient.TriggerSaturation(); }
-    public void TriggerRecovery() { if (apiClient) apiClient.TriggerRecovery(); }
+    public void SetPatrolModeMARL() { Debug.Log($"[SimulationManager] SetPatrolModeMARL called. apiClient is {(apiClient != null ? "not null" : "null")}"); if (apiClient) apiClient.SetPatrolModeMARL(); }
+    public void TriggerBlackout() { Debug.Log($"[SimulationManager] TriggerBlackout called. apiClient is {(apiClient != null ? "not null" : "null")}"); if (apiClient) apiClient.TriggerBlackout(); }
+    public void TriggerSaturation() { Debug.Log($"[SimulationManager] TriggerSaturation called. apiClient is {(apiClient != null ? "not null" : "null")}"); if (apiClient) apiClient.TriggerSaturation(); }
+    public void TriggerRecovery() { Debug.Log($"[SimulationManager] TriggerRecovery called. apiClient is {(apiClient != null ? "not null" : "null")}"); if (apiClient) apiClient.TriggerRecovery(); }
 
     [Header("Poll Settings")]
-    [Tooltip("Must match backend SIMULATION_TICK_SLEEP (default 0.5)")]
-    public float statePollInterval = 0.5f;
+    [Tooltip("Must match backend SIMULATION_TICK_SLEEP (default 3.0)")]
+    public float statePollInterval = 3.0f;
     [Tooltip("Metrics and patrol routes update less frequently")]
-    public float metricsPollInterval = 2.0f;
+    public float metricsPollInterval = 6.0f;
 
     //   Startup delay  
     [Tooltip("Seconds to wait after Play before starting polls. " +
@@ -45,6 +45,15 @@ public class SimulationManager : MonoBehaviour
     public TextMeshProUGUI connectionStatusText;
     void Start()
     {
+        // Auto-heal unassigned components dynamically at startup
+        if (apiClient == null) { apiClient = FindObjectOfType<ApiClient>(); if (apiClient != null) Debug.Log($"[SimulationManager] Auto-healed unassigned apiClient to: {apiClient.gameObject.name}"); }
+        if (dashboardController == null) { dashboardController = FindObjectOfType<DashboardController>(); if (dashboardController != null) Debug.Log($"[SimulationManager] Auto-healed unassigned dashboardController to: {dashboardController.gameObject.name}"); }
+        if (agentController == null) { agentController = FindObjectOfType<AgentController>(); if (agentController != null) Debug.Log($"[SimulationManager] Auto-healed unassigned agentController to: {agentController.gameObject.name}"); }
+        if (cityBuilder == null) { cityBuilder = FindObjectOfType<CityBuilder>(); if (cityBuilder != null) Debug.Log($"[SimulationManager] Auto-healed unassigned cityBuilder to: {cityBuilder.gameObject.name}"); }
+        if (crimeEventSpawner == null) { crimeEventSpawner = FindObjectOfType<CrimeEventSpawner>(); if (crimeEventSpawner != null) Debug.Log($"[SimulationManager] Auto-healed unassigned crimeEventSpawner to: {crimeEventSpawner.gameObject.name}"); }
+        if (dayNightController == null) { dayNightController = FindObjectOfType<DayNightController>(); if (dayNightController != null) Debug.Log($"[SimulationManager] Auto-healed unassigned dayNightController to: {dayNightController.gameObject.name}"); }
+        if (patrolLineRenderer == null) { patrolLineRenderer = FindObjectOfType<PatrolLineRenderer>(); if (patrolLineRenderer != null) Debug.Log($"[SimulationManager] Auto-healed unassigned patrolLineRenderer to: {patrolLineRenderer.gameObject.name}"); }
+
         ValidateReferences();
         StartCoroutine(Startup());
     }
@@ -87,42 +96,73 @@ public class SimulationManager : MonoBehaviour
  
     private IEnumerator PollState()
     {
+        Debug.Log($"[SimulationManager] PollState loop started. Interval: {statePollInterval}s");
         while (_isRunning)
         {
             yield return apiClient.GetState(
-                onSuccess: OnStateReceived,
-                onError: err => Debug.LogWarning($"[SimManager] /state error: {err}")
+                onSuccess: state => {
+                    Debug.Log($"[SimulationManager] /state poll successful. Tick: {state.tick}, Time: {state.time_of_day:F2}, Agents: {state.agents?.Count ?? 0}, Zones: {state.zones?.Count ?? 0}, Crimes: {state.crime_events?.Count ?? 0}");
+                    OnStateReceived(state);
+                },
+                onError: err => Debug.LogError($"[SimulationManager] /state poll error: {err}")
             );
 
             yield return new WaitForSeconds(statePollInterval);
         }
     }
 
-     
-    // Dispatch state data to all subsystems
- 
     private void OnStateReceived(StateResponse state)
     {
+        if (state == null)
+        {
+            Debug.LogError("[SimulationManager] OnStateReceived: state is null!");
+            return;
+        }
+
         //   1. Agents 
         if (agentController != null)
+        {
+            Debug.Log($"[SimulationManager] Updating {state.agents?.Count ?? 0} agents.");
             agentController.UpdateAgents(state.agents);
+        }
+        else
+        {
+            Debug.LogWarning("[SimulationManager] AgentController reference is missing!");
+        }
 
         //   2. Zones (heatmap + lighting)  
         if (cityBuilder != null && cityBuilder.IsReady)
         {
+            int zoneUpdateCount = 0;
             foreach (var zoneData in state.zones)
             {
                 if (cityBuilder.ZoneObjects.TryGetValue(zoneData.id, out var zoneGo))
                 {
                     var ctrl = zoneGo.GetComponent<ZoneController>();
-                    ctrl?.UpdateFromApi(zoneData);
+                    if (ctrl != null)
+                    {
+                        ctrl.UpdateFromApi(zoneData);
+                        zoneUpdateCount++;
+                    }
                 }
             }
+            Debug.Log($"[SimulationManager] Updated {zoneUpdateCount} zones.");
+        }
+        else
+        {
+            Debug.LogWarning($"[SimulationManager] CityBuilder reference missing or not ready. Ready={cityBuilder?.IsReady}");
         }
 
         //   3. Crime events  
         if (crimeEventSpawner != null)
-            crimeEventSpawner.ProcessEvents(state.crime_events);
+        {
+            Debug.Log($"[SimulationManager] Spawning/updating {state.crime_events?.Count ?? 0} crime events.");
+            crimeEventSpawner.ProcessEvents(state.crime_events, state.tick);
+        }
+        else
+        {
+            Debug.LogWarning("[SimulationManager] CrimeEventSpawner reference is missing!");
+        }
 
         //   4. Day/night lighting  
         if (dayNightController != null)
@@ -136,11 +176,15 @@ public class SimulationManager : MonoBehaviour
         if (patrolLineRenderer != null && state.patrol_routes != null)
             patrolLineRenderer.UpdateRoutes(state.patrol_routes);
 
-        
-        if (dashboardController != null && state.tick != _lastTick)
+        if (dashboardController != null && state.crime_events != null)
         {
+            Debug.Log($"[SimulationManager] Forwarding {state.crime_events.Count} crime events to Dashboard live dispatch.");
             foreach (var evt in state.crime_events)
-                dashboardController.AddCrimeLogEntry(evt);
+                dashboardController.AddCrimeLogEntry(evt, state.tick);
+        }
+        else
+        {
+            Debug.LogWarning($"[SimulationManager] DashboardController or crime_events missing. DashboardController={dashboardController != null}");
         }
 
         if (dashboardController != null)
@@ -148,7 +192,6 @@ public class SimulationManager : MonoBehaviour
             dashboardController.UpdateSimTime(state.time_of_day, state.tick);
             dashboardController.UpdateScenario(state.active_scenario);
         }
-
 
         if (state.tick == _lastTick) return; // skip duplicate ticks 
         _lastTick = state.tick;
@@ -186,9 +229,9 @@ public class SimulationManager : MonoBehaviour
 
     // Public scenario controls — called by UI buttons
 
-    public void SetPatrolModeGreedy() { if (apiClient) apiClient.SetPatrolMode("greedy"); }
-    public void SetPatrolModeAI() { if (apiClient) apiClient.SetPatrolMode("ai"); }
-    public void SetPatrolModeRandom() { if (apiClient) apiClient.SetPatrolMode("random"); }
+    public void SetPatrolModeGreedy() { Debug.Log($"[SimulationManager] SetPatrolModeGreedy called. apiClient is {(apiClient != null ? "not null" : "null")}"); if (apiClient) apiClient.SetPatrolMode("greedy"); }
+    public void SetPatrolModeAI() { Debug.Log($"[SimulationManager] SetPatrolModeAI called. apiClient is {(apiClient != null ? "not null" : "null")}"); if (apiClient) apiClient.SetPatrolMode("ai"); }
+    public void SetPatrolModeRandom() { Debug.Log($"[SimulationManager] SetPatrolModeRandom called. apiClient is {(apiClient != null ? "not null" : "null")}"); if (apiClient) apiClient.SetPatrolMode("random"); }
     public void AddOnePolice() { if (apiClient) apiClient.AddPolice(1); }
     public void RemoveOnePolice() { if (apiClient) apiClient.RemovePolice(1); }
     public void SetLightingDay() { if (apiClient) apiClient.SetLightingAll(1.0f); }
