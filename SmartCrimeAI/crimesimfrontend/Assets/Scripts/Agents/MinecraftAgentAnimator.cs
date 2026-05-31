@@ -1,9 +1,9 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.AI;
 
 public class MinecraftAgentAnimator : MonoBehaviour
 {
-    [Header("Limb References � assign in Inspector after prefab creation")]
+    [Header("Limb References — assign in Inspector after prefab creation")]
     public Transform armL;
     public Transform armR;
     public Transform legL;
@@ -42,17 +42,15 @@ public class MinecraftAgentAnimator : MonoBehaviour
         if (body) _bodyDefaultPos = body.localPosition;
     }
 
-  
+
     void Update()
     {
-        bool isMoving = _nav != null
-            ? _nav.velocity.magnitude > 0.3f
-            : false;
+        bool isMoving = _nav != null && _nav.velocity.magnitude > 0.5f;
 
         switch (_currentState)
         {
             case "fleeing":
-                AnimateWalk(fleeSwingAngle, fleeSpeed, isMoving);
+                AnimateFlee(isMoving);
                 break;
             case "laying_low":
                 AnimateCrouch();
@@ -60,12 +58,15 @@ public class MinecraftAgentAnimator : MonoBehaviour
             case "committing":
                 AnimateCommit();
                 break;
+            case "handcuffed":
+                AnimateHandcuffed();
+                break;
             default:
                 AnimateWalk(walkSwingAngle, walkSpeed, isMoving);
                 break;
         }
 
-        // Head always looks toward movement direction
+        // Head faces movement direction
         if (_nav != null && _nav.velocity.magnitude > 0.3f && head != null)
         {
             Vector3 flatVel = new Vector3(_nav.velocity.x, 0, _nav.velocity.z);
@@ -77,7 +78,50 @@ public class MinecraftAgentAnimator : MonoBehaviour
             }
         }
     }
- 
+
+    // ── Flee: arms raised above head, fast leg movement ──────────────────
+    private void AnimateFlee(bool isMoving)
+    {
+        _swingTime += Time.deltaTime * fleeSpeed;
+        float swing = Mathf.Sin(_swingTime) * fleeSwingAngle;
+
+        // Arms raised high (panic)
+        if (armL) armL.localEulerAngles = new Vector3(-140f, 0, -15f);
+        if (armR) armR.localEulerAngles = new Vector3(-140f, 0, 15f);
+
+        // Legs run fast
+        if (legL) legL.localEulerAngles = new Vector3(-swing, 0, 0);
+        if (legR) legR.localEulerAngles = new Vector3(swing, 0, 0);
+
+        // Body leans forward
+        if (body) body.localEulerAngles = Vector3.Lerp(
+            body.localEulerAngles, new Vector3(20f, 0, 0), Time.deltaTime * 5f);
+    }
+
+    // ── Handcuffed: both arms stretched forward, body bent ───────────────
+    private void AnimateHandcuffed()
+    {
+        // Arms stretched straight forward (wrists together)
+        if (armL) armL.localEulerAngles = Vector3.Lerp(
+            armL.localEulerAngles, new Vector3(-80f, 0, 15f), Time.deltaTime * 8f);
+        if (armR) armR.localEulerAngles = Vector3.Lerp(
+            armR.localEulerAngles, new Vector3(-80f, 0, -15f), Time.deltaTime * 8f);
+
+        // Legs together, slightly bent
+        if (legL) legL.localEulerAngles = Vector3.Lerp(
+            legL.localEulerAngles, new Vector3(15f, 0, 5f), Time.deltaTime * 8f);
+        if (legR) legR.localEulerAngles = Vector3.Lerp(
+            legR.localEulerAngles, new Vector3(15f, 0, -5f), Time.deltaTime * 8f);
+
+        // Body bent forward submissively
+        if (body) body.localEulerAngles = Vector3.Lerp(
+            body.localEulerAngles, new Vector3(30f, 0, 0), Time.deltaTime * 8f);
+
+        // Head bowed down
+        if (head) head.localEulerAngles = Vector3.Lerp(
+            head.localEulerAngles, new Vector3(20f, 0, 0), Time.deltaTime * 8f);
+    }
+
     private void AnimateWalk(float swingAngle, float speed, bool isMoving)
     {
         if (isMoving)
