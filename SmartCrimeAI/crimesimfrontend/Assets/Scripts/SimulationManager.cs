@@ -172,20 +172,10 @@ public class SimulationManager : MonoBehaviour
         if (dashboardController != null)
             dashboardController.UpdateSimTime(state.time_of_day, state.tick);
 
-        //   6. Patrol routes (from state — also fetched separately) ───────
+        //   6. Patrol routes (from state — also fetched separately) 
         if (patrolLineRenderer != null && state.patrol_routes != null)
             patrolLineRenderer.UpdateRoutes(state.patrol_routes);
 
-        if (dashboardController != null && state.crime_events != null)
-        {
-            Debug.Log($"[SimulationManager] Forwarding {state.crime_events.Count} crime events to Dashboard live dispatch.");
-            foreach (var evt in state.crime_events)
-                dashboardController.AddCrimeLogEntry(evt, state.tick);
-        }
-        else
-        {
-            Debug.LogWarning($"[SimulationManager] DashboardController or crime_events missing. DashboardController={dashboardController != null}");
-        }
 
         if (dashboardController != null)
         {

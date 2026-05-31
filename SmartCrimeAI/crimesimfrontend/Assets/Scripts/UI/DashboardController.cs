@@ -19,11 +19,6 @@ public class DashboardController : MonoBehaviour
     public TextMeshProUGUI patrolEffText;
     public TextMeshProUGUI mlAucText;
 
-    [Header("Crime Log")]
-    public Transform logContent;
-    private int _maxLogEntries = 10;
-    private List<string> _loggedIds = new();
-
     [Header("Patrol Mode Buttons")]
     public Button btnGreedy;
     public Button btnAI;
@@ -93,55 +88,6 @@ public class DashboardController : MonoBehaviour
             Debug.Log($"[DashboardController] EventSystem verified active: {eventSystem.name}");
         }
 
-        // Robust dynamic resolution of logContent if left null in the Inspector
-        if (logContent == null)
-        {
-            Debug.LogWarning("[DashboardController] logContent is null! Searching dynamically in scene hierarchy...");
-            
-            // 1. Try to find a GameObject named exactly "LogContent" or "CrimeLogContent"
-            var foundContentGo = GameObject.Find("LogContent");
-            if (foundContentGo == null) foundContentGo = GameObject.Find("CrimeLogContent");
-            
-            // 2. Try to find under the CrimeLogPanel scroll rect to prevent hijacking by other generic "Content" objects
-            if (foundContentGo == null)
-            {
-                var crimeLogPanel = GameObject.Find("CrimeLogPanel");
-                if (crimeLogPanel != null)
-                {
-                    var scrollRect = crimeLogPanel.GetComponentInChildren<ScrollRect>();
-                    if (scrollRect != null && scrollRect.content != null)
-                    {
-                        foundContentGo = scrollRect.content.gameObject;
-                    }
-                }
-            }
-
-            // 3. Fallback to generic "Content" or any ScrollRect
-            if (foundContentGo == null) foundContentGo = GameObject.Find("Content");
-            if (foundContentGo == null)
-            {
-                var scrollRect = FindObjectOfType<ScrollRect>();
-                if (scrollRect != null && scrollRect.content != null)
-                {
-                    foundContentGo = scrollRect.content.gameObject;
-                }
-            }
-
-            if (foundContentGo != null)
-            {
-                logContent = foundContentGo.transform;
-                Debug.Log($"[DashboardController] Resolved null logContent dynamically to transform: {foundContentGo.name}");
-            }
-            else
-            {
-                Debug.LogError("[DashboardController] CRITICAL: logContent is null and could NOT be resolved dynamically! Live dispatch feed will be inactive.");
-            }
-        }
-        else
-        {
-            Debug.Log($"[DashboardController] logContent verified active: {logContent.name}");
-        }
-
 
 
         // Robust dynamic resolution of key UI text fields if left unassigned
@@ -168,27 +114,7 @@ public class DashboardController : MonoBehaviour
         ResolveButton(ref btnRecovery, "BtnRecovery");
         ResolveButton(ref btnResetMetrics, "BtnResetMetrics");
 
-        // Deactivate all Day/Night lighting buttons and Crime Log/Live Dispatch panels dynamically across all loaded scenes!
-        for (int i = 0; i < UnityEngine.SceneManagement.SceneManager.sceneCount; i++)
-        {
-            var scene = UnityEngine.SceneManagement.SceneManager.GetSceneAt(i);
-            if (scene.isLoaded)
-            {
-                foreach (var rootGo in scene.GetRootGameObjects())
-                {
-                    DeactivateAllButtonsWithName(rootGo.transform, "BtnLightingDay");
-                    DeactivateAllButtonsWithName(rootGo.transform, "BtnLightingNight");
-                    DeactivateAllButtonsWithName(rootGo.transform, "CrimeLogPanel");
-                    DeactivateAllButtonsWithName(rootGo.transform, "LogScrollView");
-                    DeactivateAllButtonsWithName(rootGo.transform, "LogContent");
-                    DeactivateAllButtonsWithName(rootGo.transform, "BtnCrimeLog");
-                    DeactivateAllButtonsWithName(rootGo.transform, "BtnLog");
-                }
-            }
-        }
-
         WireButtons();
-        StyleAllText();
         Debug.Log("[DashboardController] Initialization complete. Ready.");
     }
 
@@ -335,6 +261,7 @@ public class DashboardController : MonoBehaviour
         Debug.Log("[DashboardController] All button listeners wired successfully.");
 
         // Style buttons
+        /*
         StyleButton(btnGreedy, new Color(0.10f, 0.25f, 0.70f), "#4488FF", "GREEDY");
         StyleButton(btnAI, new Color(0.30f, 0.10f, 0.60f), "#AA44FF", "AI PATROL");
         StyleButton(btnMARLPatrol, new Color(0.50f, 0.10f, 0.40f), "#FF44CC", "MARL");
@@ -344,9 +271,11 @@ public class DashboardController : MonoBehaviour
         StyleButton(btnSaturation, new Color(0.02f, 0.08f, 0.40f), "#2255FF", "SATURATION");
         StyleButton(btnRecovery, new Color(0.02f, 0.35f, 0.10f), "#00FF88", "RECOVERY");
         StyleButton(btnResetMetrics, new Color(0.20f, 0.20f, 0.20f), "#AAAAAA", "RESET");
+        */
     }
 
-    private void StyleButton(Button btn, Color bgColor, string hexText, string label)
+    /*
+     private void StyleButton(Button btn, Color bgColor, string hexText, string label)
     {
         if (btn == null) return;
 
@@ -369,7 +298,7 @@ public class DashboardController : MonoBehaviour
         colors.pressedColor = new Color(0.6f, 0.6f, 0.6f);
         btn.colors = colors;
     }
-
+    
     private void StyleAllText()
     {
         SetStyle(simTimeText, 22, "#FFFFFF", true);
@@ -383,6 +312,7 @@ public class DashboardController : MonoBehaviour
         SetStyle(patrolEffText, 14, "#FFAA00", true);
         SetStyle(mlAucText, 14, "#FF88CC", true);
     }
+    
 
     private void SetStyle(TextMeshProUGUI tmp, int size, string hex, bool bold)
     {
@@ -392,7 +322,7 @@ public class DashboardController : MonoBehaviour
         ColorUtility.TryParseHtmlString(hex, out Color c);
         tmp.color = c;
     }
-
+    */
     public void UpdateSimTime(float timeOfDay, int tick)
     {
         int hour = Mathf.FloorToInt(timeOfDay);
@@ -468,10 +398,6 @@ public class DashboardController : MonoBehaviour
         return path;
     }
 
-    public void AddCrimeLogEntry(CrimeEventData evt, int currentTick)
-    {
-        // Live dispatch deactivated as requested
-    }
 
     private void DeactivateAllButtonsWithName(Transform parent, string targetName)
     {
