@@ -70,7 +70,7 @@ Whenever the background retraining thread triggers (every 50 new crime events), 
 #### Live Analytics Panel
 ![Localhost UI Screenshot 1](media/localhost_ui_screenshot1.png)
 
-#### Model Retraining and Performance Reports
+#### AI Hotspot Prediction
 ![Localhost UI Screenshot 2](media/localhost_ui_screenshot2.png)
 
 ---
