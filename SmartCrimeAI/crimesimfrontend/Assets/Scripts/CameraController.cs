@@ -15,8 +15,8 @@ public class CameraController : MonoBehaviour
     [Header("Zoom Settings")]
     public float zoomSpeed = 5f;
     public float zoomSmoothing = 8f;
-    public float minZoom = 10f;
-    public float maxZoom = 80f;
+    public float minZoom = 20f;
+    public float maxZoom = 100f;
 
     [Header("Orbit Settings")]
     public float orbitSpeed = 100f;
@@ -30,8 +30,8 @@ public class CameraController : MonoBehaviour
     public float boundMaxZ = 70f;
 
     [Header("Starting Position")]
-    public Vector3 startPosition = new Vector3(30f, 55f, -10f);
-    public Vector3 startRotation = new Vector3(70f, 0f, 0f);
+    public Vector3 startPosition = new Vector3(30f, 805f, -45f);
+    public Vector3 startRotation = new Vector3(45f, 0f, 0f);
 
     //   Internal  
     private Vector3 _targetPosition;
