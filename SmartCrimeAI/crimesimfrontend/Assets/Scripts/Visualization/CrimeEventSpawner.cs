@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using TMPro;
@@ -11,11 +11,13 @@ public class CrimeEventSpawner : MonoBehaviour
     public float pulseSpeed = 4f;
 
     private HashSet<string> _spawnedIds = new();
+    private HashSet<string> _caughtIds = new();
+    private Dictionary<string, GameObject> _activeAlerts = new();
     private CityBuilder _cityBuilder;
 
     void Start()
     {
-        _cityBuilder = FindFirstObjectByType<CityBuilder>();
+        _cityBuilder = FindObjectOfType<CityBuilder>();
 
         if (_cityBuilder == null)
             Debug.LogError("[CrimeSpawner] CityBuilder not found in scene!");
@@ -23,13 +25,13 @@ public class CrimeEventSpawner : MonoBehaviour
             Debug.Log($"[CrimeSpawner] CityBuilder found. IsReady={_cityBuilder.IsReady}. Keys: {_cityBuilder.ZoneConfigs.Count}");
     }
 
-    public void ProcessEvents(List<CrimeEventData> events)
+    public void ProcessEvents(List<CrimeEventData> events, int currentTick)
     {
         if (events == null || events.Count == 0) return;
 
         if (_cityBuilder == null)
         {
-            _cityBuilder = FindFirstObjectByType<CityBuilder>();
+            _cityBuilder = FindObjectOfType<CityBuilder>();
             return;
         }
 
@@ -37,23 +39,46 @@ public class CrimeEventSpawner : MonoBehaviour
 
         foreach (var evt in events)
         {
-            if (_spawnedIds.Contains(evt.id)) continue;
+            // If we already spawned the green caught alert for this crime, ignore it completely to prevent duplicate cycles
+            if (_caughtIds.Contains(evt.id)) continue;
+
+            if (_spawnedIds.Contains(evt.id))
+            {
+                // If a criminal was caught, immediately update their marker from red to green in real-time!
+                if (evt.caught && _activeAlerts.TryGetValue(evt.id, out var oldAlert))
+                {
+                    _caughtIds.Add(evt.id);
+                    Destroy(oldAlert);
+                    _activeAlerts.Remove(evt.id);
+                    StartCoroutine(SpawnAlert(evt, currentTick, 2.4f));
+                }
+                continue;
+            }
+            
             _spawnedIds.Add(evt.id);
-            StartCoroutine(SpawnAlert(evt));
+            if (evt.caught)
+            {
+                _caughtIds.Add(evt.id);
+            }
+            StartCoroutine(SpawnAlert(evt, currentTick, evt.caught ? 2.4f : 0f));
         }
     }
-    private IEnumerator SpawnAlert(CrimeEventData evt)
+
+    private IEnumerator SpawnAlert(CrimeEventData evt, int currentTick, float delay = 0f)
     {
+        if (delay > 0f)
+        {
+            yield return new WaitForSeconds(delay);
+        }
+
         Debug.Log($"[CrimeSpawner] Spawning alert for zone='{evt.zone}' type='{evt.type}' caught={evt.caught}");
-        Debug.Log($"[CrimeSpawner] ZoneConfigs has {_cityBuilder.ZoneConfigs.Count} entries: {string.Join(", ", _cityBuilder.ZoneConfigs.Keys)}");
         if (!_cityBuilder.ZoneConfigs.TryGetValue(evt.zone, out var cfg))
         {
             // Try uppercase version just in case
             string upper = evt.zone.ToUpper();
             if (!_cityBuilder.ZoneConfigs.TryGetValue(upper, out cfg))
             {
-                Debug.LogWarning($"[CrimeSpawner] Zone '{evt.zone}' not in ZoneConfigs. " +
-                                 $"Keys: {string.Join(", ", _cityBuilder.ZoneConfigs.Keys)}");
+                Debug.LogWarning($"[CrimeSpawner] Zone '{evt.zone}' not in ZoneConfigs.");
                 yield break;
             }
         }
@@ -63,9 +88,10 @@ public class CrimeEventSpawner : MonoBehaviour
         float randZ = Random.Range(-1.5f, 1.5f);
         Vector3 spawnPos = new Vector3(cfg.world_x + 5f + randX, 0f, cfg.world_z + 5f + randZ);
 
+        bool inProgress = !evt.caught && (currentTick - evt.tick < 3);
         Color markerColor = evt.caught
             ? new Color(0.0f, 1.0f, 0.3f)   // green = caught
-            : new Color(1.0f, 0.15f, 0.15f); // red   = escaped
+            : (inProgress ? new Color(1.0f, 0.6f, 0.1f) : new Color(1.0f, 0.15f, 0.15f)); // orange/yellow = in progress, red = escaped
 
         // Root object
         GameObject root = new GameObject($"Alert_{evt.id}");
@@ -107,7 +133,15 @@ public class CrimeEventSpawner : MonoBehaviour
         labelGo.transform.localPosition = new Vector3(0, 4.5f, 0);
         labelGo.transform.localScale = new Vector3(0.08f, 0.08f, 0.08f);
         TextMeshPro tmp = labelGo.AddComponent<TextMeshPro>();
-        tmp.text = BuildAlertText(evt);
+
+        // Copy font from the main dashboard to prevent blank boxes
+        var dashboard = FindObjectOfType<DashboardController>();
+        if (dashboard != null && dashboard.simTimeText != null)
+        {
+            tmp.font = dashboard.simTimeText.font;
+        }
+
+        tmp.text = BuildAlertText(evt, currentTick);
         tmp.color = markerColor;
         tmp.fontSize = 28;
         tmp.alignment = TextAlignmentOptions.Center;
@@ -116,22 +150,26 @@ public class CrimeEventSpawner : MonoBehaviour
         // Always face camera
         labelGo.AddComponent<FaceCamera>();
 
-        //  Animate: spawn + pulse + fade 
-        yield return StartCoroutine(AnimateMarker(root, glow, tmp, markerColor));
+        // Cache the alert and animate
+        _activeAlerts[evt.id] = root;
+        yield return StartCoroutine(AnimateMarker(root, glow, tmp, markerColor, evt.id));
     }
 
     private IEnumerator AnimateMarker(
-        GameObject root, Light glow, TextMeshPro tmp, Color baseColor)
+        GameObject root, Light glow, TextMeshPro tmp, Color baseColor, string id)
     {
         // Phase 1: Rise up from ground (0.4s)
         float riseTime = 0.4f;
         float elapsed = 0f;
+        
+        if (root == null) yield break;
         Vector3 startPos = root.transform.position;
         Vector3 endPos = startPos + Vector3.up * riseHeight;
         root.transform.localScale = Vector3.zero;
 
         while (elapsed < riseTime)
         {
+            if (root == null) yield break;
             elapsed += Time.deltaTime;
             float t = elapsed / riseTime;
             float ease = 1f - Mathf.Pow(1f - t, 3f);  // ease out cubic
@@ -141,6 +179,7 @@ public class CrimeEventSpawner : MonoBehaviour
             yield return null;
         }
 
+        if (root == null) yield break;
         root.transform.position = endPos;
         root.transform.localScale = Vector3.one;
 
@@ -148,6 +187,7 @@ public class CrimeEventSpawner : MonoBehaviour
         float aliveTime = 0f;
         while (aliveTime < markerLifetime)
         {
+            if (root == null) yield break;
             aliveTime += Time.deltaTime;
 
             // Pulse scale
@@ -170,15 +210,18 @@ public class CrimeEventSpawner : MonoBehaviour
         float fadeTime = 1.5f;
         float fadeElapsed = 0f;
 
+        if (root == null) yield break;
         var renderers = root.GetComponentsInChildren<Renderer>();
 
-        while (fadeElapsed < fadeTime && root != null)
+        while (fadeElapsed < fadeTime)
         {
+            if (root == null) yield break;
             fadeElapsed += Time.deltaTime;
             float alpha = Mathf.Lerp(1f, 0f, fadeElapsed / fadeTime);
 
             foreach (var r in renderers)
             {
+                if (r == null) continue;
                 if (r.material.shader.name.Contains("TextMeshPro")) continue;
                 if (!r.material.HasProperty("_BaseColor") && !r.material.HasProperty("_Color")) continue;
                 Color c = r.material.color;
@@ -192,9 +235,10 @@ public class CrimeEventSpawner : MonoBehaviour
         }
 
         if (root != null) Destroy(root);
+        _activeAlerts.Remove(id);
     }
 
-    private string BuildAlertText(CrimeEventData evt)
+    private string BuildAlertText(CrimeEventData evt, int currentTick)
     {
         string icon = evt.caught ? "[CAUGHT]" : "[CRIME]";
 
@@ -207,7 +251,8 @@ public class CrimeEventSpawner : MonoBehaviour
             _ => evt.type.ToUpper()
         };
 
-        string status = evt.caught ? "CRIMINAL CAUGHT" : "CRIMINAL ESCAPED";
+        bool inProgress = !evt.caught && (currentTick - evt.tick < 3);
+        string status = evt.caught ? "CRIMINAL CAUGHT" : (inProgress ? "CRIME IN PROGRESS" : "CRIMINAL ESCAPED");
 
         int hour = Mathf.FloorToInt(evt.time_of_day);
         int min = Mathf.FloorToInt((evt.time_of_day - hour) * 60);
@@ -227,5 +272,10 @@ public class CrimeEventSpawner : MonoBehaviour
         r.material = mat;
     }
 
-    public void ClearHistory() => _spawnedIds.Clear();
+    public void ClearHistory()
+    {
+        _spawnedIds.Clear();
+        _caughtIds.Clear();
+        _activeAlerts.Clear();
+    }
 }

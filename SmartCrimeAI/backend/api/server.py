@@ -160,6 +160,7 @@ def _crime_event_dict(event: Any) -> Dict[str, Any]:
         return {
             "id": str(event.get("crime_id", "")),
             "zone": str(event.get("zone_id", "")),
+            "tick": _to_native(event.get("tick", 0)),
             "time_of_day": _to_native(event.get("time_of_day", 0.0)),
             "type": str(event.get("crime_type", "unknown")),
             "caught": bool(event.get("caught", False)),
@@ -167,6 +168,7 @@ def _crime_event_dict(event: Any) -> Dict[str, Any]:
     return {
         "id": str(getattr(event, "crime_id", "")),
         "zone": str(getattr(event, "zone_id", "")),
+        "tick": _to_native(getattr(event, "tick", 0)),
         "time_of_day": _to_native(getattr(event, "time_of_day", 0.0)),
         "type": str(getattr(event, "crime_type", "unknown")),
         "caught": bool(getattr(event, "caught", False)),

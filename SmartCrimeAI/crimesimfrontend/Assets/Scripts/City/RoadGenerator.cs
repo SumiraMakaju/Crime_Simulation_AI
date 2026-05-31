@@ -14,7 +14,7 @@ public class RoadGenerator : MonoBehaviour
  
     void Start()
     {
-        _cityBuilder = FindFirstObjectByType<CityBuilder>();
+        _cityBuilder = FindObjectOfType<CityBuilder>();
         if (_cityBuilder == null) return;
 
         // Wait one frame for CityBuilder to finish

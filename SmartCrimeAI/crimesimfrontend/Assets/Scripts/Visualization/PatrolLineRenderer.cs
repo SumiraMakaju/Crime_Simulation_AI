@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 
 public class PatrolLineRenderer : MonoBehaviour
@@ -42,6 +42,18 @@ public class PatrolLineRenderer : MonoBehaviour
             patrolLineMaterial.SetTextureOffset("_MainTex",
                 new Vector2(offset, 0));
         }
+    }
+
+    public Color GetPoliceColor(string policeId)
+    {
+        if (_lineColors.TryGetValue(policeId, out var color))
+            return color;
+
+        // Assign and cycle new color if not created yet
+        Color newColor = _routeColors[_colorIndex % _routeColors.Length];
+        _colorIndex++;
+        _lineColors[policeId] = newColor;
+        return newColor;
     }
 
  
@@ -121,10 +133,13 @@ public class PatrolLineRenderer : MonoBehaviour
 
         var lr = go.AddComponent<LineRenderer>();
 
-        // Assign color — cycle through palette
-        Color color = _routeColors[_colorIndex % _routeColors.Length];
-        _colorIndex++;
-        _lineColors[policeId] = color;
+        // Assign color — use cached if available, otherwise cycle through palette
+        if (!_lineColors.TryGetValue(policeId, out Color color))
+        {
+            color = _routeColors[_colorIndex % _routeColors.Length];
+            _colorIndex++;
+            _lineColors[policeId] = color;
+        }
 
         lr.material = patrolLineMaterial != null
                                ? new Material(patrolLineMaterial)

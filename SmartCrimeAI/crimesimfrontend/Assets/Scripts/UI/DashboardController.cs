@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
@@ -33,9 +33,7 @@ public class DashboardController : MonoBehaviour
     public Button btnAddPolice;
     public Button btnRemovePolice;
 
-    [Header("Lighting Buttons")]
-    public Button btnLightingDay;
-    public Button btnLightingNight;
+
 
     [Header("Macro Scenario Buttons")]
     public Button btnBlackout;
@@ -49,48 +47,292 @@ public class DashboardController : MonoBehaviour
 
     void Start()
     {
-        _sim = FindFirstObjectByType<SimulationManager>();
+        Debug.Log("[DashboardController] Start initiated.");
+        
+        // Dynamic search to locate the active, working SimulationManager (bypassing duplicate dummy instances!)
+        var sims = FindObjectsOfType<SimulationManager>();
+        foreach (var s in sims)
+        {
+            if (s.apiClient != null)
+            {
+                _sim = s;
+                // Auto-heal the other side as well by bi-directionally assigning us!
+                s.dashboardController = this;
+                Debug.Log($"[DashboardController] Bi-directionally resolved and auto-wired active SimulationManager: '{s.gameObject.name}' with ApiClient '{s.apiClient.gameObject.name}'");
+                break;
+            }
+        }
 
         if (_sim == null)
         {
-            Debug.LogError("[Dashboard] SimulationManager not found!");
+            _sim = FindObjectOfType<SimulationManager>();
+            if (_sim != null)
+            {
+                Debug.LogWarning($"[DashboardController] Active SimulationManager with assigned ApiClient not found! Falling back to default instance: {_sim.gameObject.name}");
+            }
+        }
+
+        if (_sim == null)
+        {
+            Debug.LogError("[DashboardController] SimulationManager NOT found in scene!");
             return;
+        }
+
+        // Verify or dynamically create EventSystem to make sure clicks work!
+        var eventSystem = FindObjectOfType<UnityEngine.EventSystems.EventSystem>();
+        if (eventSystem == null)
+        {
+            Debug.LogWarning("[DashboardController] EventSystem NOT found in scene! Dynamically creating a new EventSystem to restore UI click functionality.");
+            GameObject eventSystemGo = new GameObject("EventSystem");
+            eventSystem = eventSystemGo.AddComponent<UnityEngine.EventSystems.EventSystem>();
+            eventSystemGo.AddComponent<UnityEngine.EventSystems.StandaloneInputModule>();
+            Debug.Log("[DashboardController] Dynamically created and configured EventSystem + StandaloneInputModule successfully.");
+        }
+        else
+        {
+            Debug.Log($"[DashboardController] EventSystem verified active: {eventSystem.name}");
+        }
+
+        // Robust dynamic resolution of logContent if left null in the Inspector
+        if (logContent == null)
+        {
+            Debug.LogWarning("[DashboardController] logContent is null! Searching dynamically in scene hierarchy...");
+            
+            // 1. Try to find a GameObject named exactly "LogContent" or "CrimeLogContent"
+            var foundContentGo = GameObject.Find("LogContent");
+            if (foundContentGo == null) foundContentGo = GameObject.Find("CrimeLogContent");
+            
+            // 2. Try to find under the CrimeLogPanel scroll rect to prevent hijacking by other generic "Content" objects
+            if (foundContentGo == null)
+            {
+                var crimeLogPanel = GameObject.Find("CrimeLogPanel");
+                if (crimeLogPanel != null)
+                {
+                    var scrollRect = crimeLogPanel.GetComponentInChildren<ScrollRect>();
+                    if (scrollRect != null && scrollRect.content != null)
+                    {
+                        foundContentGo = scrollRect.content.gameObject;
+                    }
+                }
+            }
+
+            // 3. Fallback to generic "Content" or any ScrollRect
+            if (foundContentGo == null) foundContentGo = GameObject.Find("Content");
+            if (foundContentGo == null)
+            {
+                var scrollRect = FindObjectOfType<ScrollRect>();
+                if (scrollRect != null && scrollRect.content != null)
+                {
+                    foundContentGo = scrollRect.content.gameObject;
+                }
+            }
+
+            if (foundContentGo != null)
+            {
+                logContent = foundContentGo.transform;
+                Debug.Log($"[DashboardController] Resolved null logContent dynamically to transform: {foundContentGo.name}");
+            }
+            else
+            {
+                Debug.LogError("[DashboardController] CRITICAL: logContent is null and could NOT be resolved dynamically! Live dispatch feed will be inactive.");
+            }
+        }
+        else
+        {
+            Debug.Log($"[DashboardController] logContent verified active: {logContent.name}");
+        }
+
+
+
+        // Robust dynamic resolution of key UI text fields if left unassigned
+        ResolveText(ref simTimeText, "SimTimeText", "TimeText");
+        ResolveText(ref tickText, "TickText");
+        ResolveText(ref patrolModeText, "PatrolModeText", "ModeText");
+        ResolveText(ref activeScenarioText, "ActiveScenarioText", "ScenarioText");
+        ResolveText(ref totalCrimesText, "TotalCrimesText");
+        ResolveText(ref totalCaughtText, "TotalCaughtText");
+        ResolveText(ref catchRateText, "CatchRateText");
+        ResolveText(ref avgResponseText, "AvgResponseText");
+        ResolveText(ref patrolEffText, "PatrolEffText");
+        ResolveText(ref mlAucText, "MlAucText");
+
+        // Robust fallback button assignments if left null in the Inspector
+        ResolveButton(ref btnGreedy, "BtnGreedy");
+        ResolveButton(ref btnAI, "BtnAI");
+        ResolveButton(ref btnMARLPatrol, "BtnMARL", "BtnMARLPatrol");
+        ResolveButton(ref btnAddPolice, "BtnAddPolice");
+        ResolveButton(ref btnRemovePolice, "BtnRemovePolice");
+
+        ResolveButton(ref btnBlackout, "BtnBlackout");
+        ResolveButton(ref btnSaturation, "BtnSaturation");
+        ResolveButton(ref btnRecovery, "BtnRecovery");
+        ResolveButton(ref btnResetMetrics, "BtnResetMetrics");
+
+        // Deactivate all Day/Night lighting buttons and Crime Log/Live Dispatch panels dynamically across all loaded scenes!
+        for (int i = 0; i < UnityEngine.SceneManagement.SceneManager.sceneCount; i++)
+        {
+            var scene = UnityEngine.SceneManagement.SceneManager.GetSceneAt(i);
+            if (scene.isLoaded)
+            {
+                foreach (var rootGo in scene.GetRootGameObjects())
+                {
+                    DeactivateAllButtonsWithName(rootGo.transform, "BtnLightingDay");
+                    DeactivateAllButtonsWithName(rootGo.transform, "BtnLightingNight");
+                    DeactivateAllButtonsWithName(rootGo.transform, "CrimeLogPanel");
+                    DeactivateAllButtonsWithName(rootGo.transform, "LogScrollView");
+                    DeactivateAllButtonsWithName(rootGo.transform, "LogContent");
+                    DeactivateAllButtonsWithName(rootGo.transform, "BtnCrimeLog");
+                    DeactivateAllButtonsWithName(rootGo.transform, "BtnLog");
+                }
+            }
         }
 
         WireButtons();
         StyleAllText();
-        Debug.Log("[Dashboard] Ready.");
+        Debug.Log("[DashboardController] Initialization complete. Ready.");
+    }
+
+    private void ResolveButton(ref Button btn, string name, string fallbackName = "")
+    {
+        if (btn != null)
+        {
+            Debug.Log($"[DashboardController] Button '{name}' already assigned via Inspector.");
+            // Verify parent canvas has a GraphicRaycaster component
+            var canvas = btn.GetComponentInParent<Canvas>();
+            if (canvas != null && canvas.GetComponent<GraphicRaycaster>() == null)
+            {
+                Debug.LogWarning($"[DashboardController] Canvas '{canvas.name}' containing button '{name}' is missing a GraphicRaycaster! Adding one dynamically.");
+                canvas.gameObject.AddComponent<GraphicRaycaster>();
+            }
+            return;
+        }
+
+        var go = GameObject.Find(name);
+        if (go == null && !string.IsNullOrEmpty(fallbackName))
+        {
+            go = GameObject.Find(fallbackName);
+        }
+
+        if (go != null)
+        {
+            btn = go.GetComponent<Button>();
+            Debug.Log($"[DashboardController] Resolved null button '{name}' from scene hierarchy: {go.name}");
+            
+            // Verify parent canvas has a GraphicRaycaster component
+            var canvas = btn.GetComponentInParent<Canvas>();
+            if (canvas != null && canvas.GetComponent<GraphicRaycaster>() == null)
+            {
+                Debug.LogWarning($"[DashboardController] Canvas '{canvas.name}' containing button '{name}' is missing a GraphicRaycaster! Adding one dynamically.");
+                canvas.gameObject.AddComponent<GraphicRaycaster>();
+            }
+        }
+        else
+        {
+            Debug.LogWarning($"[DashboardController] Button '{name}' is null and could NOT be found in scene hierarchy!");
+        }
+    }
+
+    private void ResolveText(ref TextMeshProUGUI text, string name, string fallbackName = "")
+    {
+        if (text != null)
+        {
+            Debug.Log($"[DashboardController] Text element '{name}' already assigned via Inspector.");
+            return;
+        }
+
+        var go = GameObject.Find(name);
+        if (go == null && !string.IsNullOrEmpty(fallbackName))
+        {
+            go = GameObject.Find(fallbackName);
+        }
+
+        if (go != null)
+        {
+            text = go.GetComponent<TextMeshProUGUI>();
+            Debug.Log($"[DashboardController] Resolved null text element '{name}' from scene hierarchy: {go.name}");
+        }
+        else
+        {
+            Debug.LogWarning($"[DashboardController] Text element '{name}' is null and could NOT be found in scene hierarchy!");
+        }
+    }
+
+    public void UpdatePatrolModeUI(string mode)
+    {
+        if (patrolModeText == null) return;
+        patrolModeText.text = $"MODE: {mode.ToUpper()}";
+        string hex = mode switch
+        {
+            "ai" => "#AA44FF",
+            "marl" => "#FF44CC",
+            "random" => "#FFAA00",
+            _ => "#44AAFF"
+        };
+        ColorUtility.TryParseHtmlString(hex, out Color mc);
+        patrolModeText.color = mc;
     }
 
     private void WireButtons()
     {
+        Debug.Log("[DashboardController] Wiring button listeners...");
         // Clear all listeners first
         btnGreedy?.onClick.RemoveAllListeners();
         btnAI?.onClick.RemoveAllListeners();
         btnMARLPatrol?.onClick.RemoveAllListeners();
         btnAddPolice?.onClick.RemoveAllListeners();
         btnRemovePolice?.onClick.RemoveAllListeners();
-        btnLightingDay?.onClick.RemoveAllListeners();
-        btnLightingNight?.onClick.RemoveAllListeners();
         btnBlackout?.onClick.RemoveAllListeners();
         btnSaturation?.onClick.RemoveAllListeners();
         btnRecovery?.onClick.RemoveAllListeners();
         btnResetMetrics?.onClick.RemoveAllListeners();
 
-        // Wire fresh
-        btnGreedy?.onClick.AddListener(() => _sim.SetPatrolModeGreedy());
-        btnAI?.onClick.AddListener(() => _sim.SetPatrolModeAI());
-        btnMARLPatrol?.onClick.AddListener(() => _sim.SetPatrolModeMARL());
-        btnAddPolice?.onClick.AddListener(() => _sim.AddOnePolice());
-        btnRemovePolice?.onClick.AddListener(() => _sim.RemoveOnePolice());
-        btnLightingDay?.onClick.AddListener(() => _sim.SetLightingDay());
-        btnLightingNight?.onClick.AddListener(() => _sim.SetLightingNight());
-        btnBlackout?.onClick.AddListener(() => _sim.TriggerBlackout());
-        btnSaturation?.onClick.AddListener(() => _sim.TriggerSaturation());
-        btnRecovery?.onClick.AddListener(() => _sim.TriggerRecovery());
-        btnResetMetrics?.onClick.AddListener(() => _sim.ResetMetrics());
+        // Wire fresh with instant, optimistic UI feedback
+        if (btnGreedy != null) btnGreedy.onClick.AddListener(() => {
+            Debug.Log("[DashboardController] BtnGreedy clicked. Sending Greedy Patrol mode.");
+            _sim.SetPatrolModeGreedy();
+            UpdatePatrolModeUI("greedy");
+        });
+        if (btnAI != null) btnAI.onClick.AddListener(() => {
+            Debug.Log("[DashboardController] BtnAI clicked. Sending AI Patrol mode.");
+            _sim.SetPatrolModeAI();
+            UpdatePatrolModeUI("ai");
+        });
+        if (btnMARLPatrol != null) btnMARLPatrol.onClick.AddListener(() => {
+            Debug.Log("[DashboardController] BtnMARLPatrol clicked. Sending MARL Patrol mode.");
+            _sim.SetPatrolModeMARL();
+            UpdatePatrolModeUI("marl");
+        });
+        if (btnAddPolice != null) btnAddPolice.onClick.AddListener(() => {
+            Debug.Log("[DashboardController] BtnAddPolice clicked. Adding police officer.");
+            _sim.AddOnePolice();
+        });
+        if (btnRemovePolice != null) btnRemovePolice.onClick.AddListener(() => {
+            Debug.Log("[DashboardController] BtnRemovePolice clicked. Removing police officer.");
+            _sim.RemoveOnePolice();
+        });
+        if (btnBlackout != null) btnBlackout.onClick.AddListener(() => {
+            Debug.Log("[DashboardController] BtnBlackout clicked. Triggering blackout macro.");
+            _sim.TriggerBlackout();
+            UpdateScenario("blackout");
+            UpdatePatrolModeUI("greedy");
+        });
+        if (btnSaturation != null) btnSaturation.onClick.AddListener(() => {
+            Debug.Log("[DashboardController] BtnSaturation clicked. Triggering saturation macro.");
+            _sim.TriggerSaturation();
+            UpdateScenario("saturation");
+            UpdatePatrolModeUI("marl");
+        });
+        if (btnRecovery != null) btnRecovery.onClick.AddListener(() => {
+            Debug.Log("[DashboardController] BtnRecovery clicked. Triggering recovery macro.");
+            _sim.TriggerRecovery();
+            UpdateScenario("normal");
+        });
+        if (btnResetMetrics != null) btnResetMetrics.onClick.AddListener(() => {
+            Debug.Log("[DashboardController] BtnResetMetrics clicked. Resetting dashboard metrics.");
+            _sim.ResetMetrics();
+        });
 
-        Debug.Log("[Dashboard] Buttons wired.");
+        Debug.Log("[DashboardController] All button listeners wired successfully.");
 
         // Style buttons
         StyleButton(btnGreedy, new Color(0.10f, 0.25f, 0.70f), "#4488FF", "GREEDY");
@@ -98,8 +340,6 @@ public class DashboardController : MonoBehaviour
         StyleButton(btnMARLPatrol, new Color(0.50f, 0.10f, 0.40f), "#FF44CC", "MARL");
         StyleButton(btnAddPolice, new Color(0.05f, 0.35f, 0.15f), "#00FF64", "+ POLICE");
         StyleButton(btnRemovePolice, new Color(0.45f, 0.05f, 0.05f), "#FF4444", "- POLICE");
-        StyleButton(btnLightingDay, new Color(0.45f, 0.32f, 0.00f), "#FFCC00", "DAY");
-        StyleButton(btnLightingNight, new Color(0.05f, 0.05f, 0.25f), "#4466FF", "NIGHT");
         StyleButton(btnBlackout, new Color(0.40f, 0.02f, 0.02f), "#FF2222", "BLACKOUT");
         StyleButton(btnSaturation, new Color(0.02f, 0.08f, 0.40f), "#2255FF", "SATURATION");
         StyleButton(btnRecovery, new Color(0.02f, 0.35f, 0.10f), "#00FF88", "RECOVERY");
@@ -216,44 +456,39 @@ public class DashboardController : MonoBehaviour
         }
     }
 
-    public void AddCrimeLogEntry(CrimeEventData evt)
+    private string GetGameObjectPath(GameObject obj)
     {
-        if (logContent == null || _loggedIds.Contains(evt.id)) return;
-        _loggedIds.Add(evt.id);
-
-        while (logContent.childCount >= _maxLogEntries)
+        if (obj == null) return "null";
+        string path = "/" + obj.name;
+        while (obj.transform.parent != null)
         {
-            var oldest = logContent.GetChild(0).gameObject;
-            oldest.transform.SetParent(null);
-            Destroy(oldest);
+            obj = obj.transform.parent.gameObject;
+            path = "/" + obj.name + path;
         }
+        return path;
+    }
 
-        var entry = new GameObject("LogEntry_" + evt.id);
-        entry.transform.SetParent(logContent, false);
+    public void AddCrimeLogEntry(CrimeEventData evt, int currentTick)
+    {
+        // Live dispatch deactivated as requested
+    }
 
-        var le = entry.AddComponent<LayoutElement>();
-        le.preferredHeight = 20;
-        le.flexibleWidth = 1;
-
-        var tmp = entry.AddComponent<TextMeshProUGUI>();
-        int hour = Mathf.FloorToInt(evt.time_of_day);
-        int min = Mathf.FloorToInt((evt.time_of_day - hour) * 60);
-        string ampm = hour >= 12 ? "PM" : "AM";
-        int h12 = hour % 12 == 0 ? 12 : hour % 12;
-        string status = evt.caught ? "CAUGHT" : "ESCAPED";
-
-        tmp.text = $"{h12}:{min:D2}{ampm} {evt.type.ToUpper()} {evt.zone} {status}";
-        tmp.fontSize = 10;
-        tmp.fontStyle = FontStyles.Bold;
-        tmp.color = evt.caught
-            ? new Color(0.2f, 1.0f, 0.4f)
-            : new Color(1.0f, 0.3f, 0.3f);
-
-        var sr = logContent.GetComponentInParent<ScrollRect>();
-        if (sr != null)
+    private void DeactivateAllButtonsWithName(Transform parent, string targetName)
+    {
+        if (parent.name == targetName)
         {
-            Canvas.ForceUpdateCanvases();
-            sr.verticalNormalizedPosition = 0f;
+            parent.gameObject.SetActive(false);
+            Debug.Log($"[DashboardController] Found and dynamically deactivated '{targetName}' at hierarchy path: {GetGameObjectPath(parent.gameObject)}");
         }
+        
+        for (int i = 0; i < parent.childCount; i++)
+        {
+            DeactivateAllButtonsWithName(parent.GetChild(i), targetName);
+        }
+    }
+
+    private void AutoHealPanelLayout()
+    {
+        // Layout self-healing deactivated as live dispatch is removed
     }
 }

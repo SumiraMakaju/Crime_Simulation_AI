@@ -47,6 +47,7 @@ public class UIStyler : MonoBehaviour
         var img = panel.GetComponent<Image>();
         if (img == null) img = panel.AddComponent<Image>();
         img.color = bgColor;
+        img.raycastTarget = false; // CRITICAL: Prevent parent panel backgrounds from blocking click raycasts to child buttons!
 
         // Rounded corners via sprite (use Unity's built-in rounded rect)
         img.sprite = CreateRoundedSprite();
@@ -68,6 +69,7 @@ public class UIStyler : MonoBehaviour
 
             var lineImg = lineGo.AddComponent<Image>();
             lineImg.color = lineColor;
+            lineImg.raycastTarget = false; // Prevent accent lines from blocking click raycasts
         }
     }
 
@@ -92,16 +94,6 @@ public class UIStyler : MonoBehaviour
             new Color(0.50f, 0.08f, 0.08f),
             new Color(1.00f, 0.25f, 0.25f),
             "- REMOVE POLICE");
-
-        StyleSingleButton("BtnLightingDay",
-            new Color(0.50f, 0.38f, 0.00f),
-            new Color(1.00f, 0.78f, 0.10f),
-            "SET DAY");
-
-        StyleSingleButton("BtnLightingNight",
-            new Color(0.05f, 0.05f, 0.25f),
-            new Color(0.20f, 0.20f, 0.80f),
-            "SET NIGHT");
     }
 
     private void StyleSingleButton(string btnName, Color bgColor,
@@ -115,9 +107,12 @@ public class UIStyler : MonoBehaviour
 
         //  Background image 
         var img = btnGo.GetComponent<Image>();
-        img.color = bgColor;
-        img.sprite = CreateRoundedSprite();
-        img.type = Image.Type.Sliced;
+        if (img != null)
+        {
+            img.color = bgColor;
+            img.sprite = CreateRoundedSprite();
+            img.type = Image.Type.Sliced;
+        }
 
         //  Color transition on hover/press 
         var colors = btn.colors;
@@ -154,6 +149,7 @@ public class UIStyler : MonoBehaviour
             glowColor.r, glowColor.g, glowColor.b, 0.4f);
         outlineImg.sprite = CreateRoundedSprite();
         outlineImg.type = Image.Type.Sliced;
+        outlineImg.raycastTarget = false; // Prevent outlines from intercepting click raycasts
     }
 
     private Sprite CreateRoundedSprite()
