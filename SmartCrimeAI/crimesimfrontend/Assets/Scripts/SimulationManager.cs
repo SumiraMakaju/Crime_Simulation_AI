@@ -65,23 +65,37 @@ public class SimulationManager : MonoBehaviour
     {
         SetConnectionStatus("Connecting to backend...", Color.yellow);
 
-        // Step 1: test backend connection
         bool connected = false;
-        yield return apiClient.TestConnection(
-            onSuccess: () => connected = true,
-            onFail: msg =>
-            {
-                SetConnectionStatus("Backend offline — start python main.py", Color.red);
-                Debug.LogError($"[SimManager] {msg}");
-            }
-        );
+        int attempts = 0;
+        
+        while (!connected)
+        {
+            attempts++;
+            yield return apiClient.TestConnection(
+                onSuccess: () => connected = true,
+                onFail: msg =>
+                {
+                    SetConnectionStatus($"Connecting... (Attempt {attempts} — server loading)", Color.yellow);
+                }
+            );
 
-        if (!connected) yield break;
+            if (!connected)
+            {
+                // Wait 2 seconds before retrying to give the background server process time to initialize
+                yield return new WaitForSeconds(2.0f);
+            }
+        }
 
         _backendOnline = true;
         SetConnectionStatus("Backend online", Color.green);
 
-        // Step 2: wait for CityBuilder to finish
+        // Step 2: wait for CityBuilder to finish or dynamically build the city if it wasn't ready
+        if (cityBuilder != null && !cityBuilder.IsReady)
+        {
+            Debug.Log("[SimulationManager] Backend is online! Dynamically spawning the city environment blocks and road surfaces...");
+            cityBuilder.BuildCity();
+        }
+
         yield return new WaitForSeconds(startupDelay);
 
         // Step 3: start poll loops

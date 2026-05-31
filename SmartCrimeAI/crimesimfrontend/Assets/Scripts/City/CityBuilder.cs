@@ -58,6 +58,35 @@ public class CityBuilder : MonoBehaviour
         string fullPath = Path.Combine(solutionRoot, "backend", "shared", "zone_config.json");
         fullPath = Path.GetFullPath(fullPath);
 
+        // Standalone Build and Folder Fallback System
+        if (!File.Exists(fullPath))
+        {
+            // 1. Try built standalone relative path: shared/zone_config.json next to the game exe
+            string buildPath = Path.GetFullPath(Path.Combine(Application.dataPath, "../shared/zone_config.json"));
+            if (File.Exists(buildPath))
+            {
+                fullPath = buildPath;
+            }
+            else
+            {
+                // 2. Try intermediate folder structure: SmartCrimeAI/backend/shared/zone_config.json
+                string intermediatePath = Path.GetFullPath(Path.Combine(Application.dataPath, "../SmartCrimeAI/backend/shared/zone_config.json"));
+                if (File.Exists(intermediatePath))
+                {
+                    fullPath = intermediatePath;
+                }
+                else
+                {
+                    // 3. Try same-directory fallback: shared/zone_config.json
+                    string localPath = Path.GetFullPath(Path.Combine(Application.dataPath, "shared/zone_config.json"));
+                    if (File.Exists(localPath))
+                    {
+                        fullPath = localPath;
+                    }
+                }
+            }
+        }
+
         Debug.Log($"[CityBuilder] Resolved zone_config.json path:\n{fullPath}");
 
         if (!File.Exists(fullPath))
