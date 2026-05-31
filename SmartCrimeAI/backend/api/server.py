@@ -181,7 +181,12 @@ def create_app(sim_state: SimulationState) -> FastAPI:
     
     # Store reference to the FastAPI event loop for background thread broadcasting
     import asyncio
-    sim_state.loop = asyncio.get_event_loop()
+    try:
+        sim_state.loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        sim_state.loop = loop
 
     app = FastAPI(
         title="Smart Crime AI — Backend API",
