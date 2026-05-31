@@ -11,13 +11,14 @@ public class StateResponse
 {
     public int tick;
     public float time_of_day;
+    public string active_scenario;
     public List<AgentData> agents;
     public List<ZoneData> zones;
     public Dictionary<string, List<string>> patrol_routes;
     public List<CrimeEventData> crime_events;
 }
 
- 
+
 
 [Serializable]
 public class AgentData

@@ -162,30 +162,21 @@ public class ApiClient : MonoBehaviour
 
         onSuccess?.Invoke(result);
     }
- 
+
     private IEnumerator PostScenario(object payload,
-                                     Action<string> onComplete = null,
-                                     Action<string> onError = null)
+                                 string endpoint = "/scenario",
+                                 Action<string> onComplete = null,
+                                 Action<string> onError = null)
     {
-        string json;
-        try
+        string json = JsonConvert.SerializeObject(payload, new JsonSerializerSettings
         {
-            // Null handling: serialize only non-null, non-zero fields
-            json = JsonConvert.SerializeObject(payload, new JsonSerializerSettings
-            {
-                NullValueHandling = NullValueHandling.Ignore,
-                DefaultValueHandling = DefaultValueHandling.Ignore
-            });
-        }
-        catch (Exception e)
-        {
-            onError?.Invoke($"[/scenario] Serialize error: {e.Message}");
-            yield break;
-        }
+            NullValueHandling = NullValueHandling.Ignore,
+            DefaultValueHandling = DefaultValueHandling.Ignore
+        });
 
         byte[] bodyRaw = System.Text.Encoding.UTF8.GetBytes(json);
 
-        using var req = new UnityWebRequest($"{BASE_URL}/scenario", "POST");
+        using var req = new UnityWebRequest($"{BASE_URL}{endpoint}", "POST");
         req.uploadHandler = new UploadHandlerRaw(bodyRaw);
         req.downloadHandler = new DownloadHandlerBuffer();
         req.SetRequestHeader("Content-Type", "application/json");
@@ -195,13 +186,12 @@ public class ApiClient : MonoBehaviour
 
         if (req.result != UnityWebRequest.Result.Success)
         {
-            onError?.Invoke($"[/scenario] {req.error}");
+            onError?.Invoke($"[{endpoint}] {req.error}");
             yield break;
         }
-
         onComplete?.Invoke(req.downloadHandler.text);
     }
- 
+
 
     public void SetPatrolMode(string mode)
     {
@@ -298,5 +288,44 @@ public class ApiClient : MonoBehaviour
             Debug.LogError($"[API] {msg}");
             onFail?.Invoke(msg);
         }
+    }
+
+    public void TriggerBlackout()
+    {
+        StartCoroutine(PostScenario(
+            new { },
+            endpoint: "/scenario/blackout",
+            onComplete: r => Debug.Log("[API] Blackout triggered"),
+            onError: err => Debug.LogWarning($"[API] Blackout failed: {err}")
+        ));
+    }
+
+    public void TriggerSaturation()
+    {
+        StartCoroutine(PostScenario(
+            new { },
+            endpoint: "/scenario/saturation",
+            onComplete: r => Debug.Log("[API] Saturation triggered"),
+            onError: err => Debug.LogWarning($"[API] Saturation failed: {err}")
+        ));
+    }
+
+    public void TriggerRecovery()
+    {
+        StartCoroutine(PostScenario(
+            new { },
+            endpoint: "/scenario/recovery",
+            onComplete: r => Debug.Log("[API] Recovery triggered"),
+            onError: err => Debug.LogWarning($"[API] Recovery failed: {err}")
+        ));
+    }
+
+    public void SetPatrolModeMARL()
+    {
+        StartCoroutine(PostScenario(
+            new { set_patrol_mode = "marl" },
+            onComplete: r => Debug.Log("[API] Patrol mode → MARL"),
+            onError: err => Debug.LogWarning($"[API] MARL failed: {err}")
+        ));
     }
 }

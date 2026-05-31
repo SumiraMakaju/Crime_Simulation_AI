@@ -9,8 +9,9 @@ public class DashboardController : MonoBehaviour
     public TextMeshProUGUI simTimeText;
     public TextMeshProUGUI tickText;
     public TextMeshProUGUI patrolModeText;
+    public TextMeshProUGUI activeScenarioText;
 
-    [Header("Metrics Panel")]
+    [Header("Metrics")]
     public TextMeshProUGUI totalCrimesText;
     public TextMeshProUGUI totalCaughtText;
     public TextMeshProUGUI catchRateText;
@@ -19,18 +20,30 @@ public class DashboardController : MonoBehaviour
     public TextMeshProUGUI mlAucText;
 
     [Header("Crime Log")]
-    public Transform logContent;       // Content inside ScrollView
-    public GameObject logEntryPrefab;   // TMP text prefab
-    private int _maxLogEntries = 12;
+    public Transform logContent;
+    private int _maxLogEntries = 10;
     private List<string> _loggedIds = new();
 
-    [Header("Scenario Buttons — assign in Inspector")]
+    [Header("Patrol Mode Buttons")]
     public Button btnGreedy;
     public Button btnAI;
+    public Button btnMARLPatrol;
+
+    [Header("Police Buttons")]
     public Button btnAddPolice;
     public Button btnRemovePolice;
+
+    [Header("Lighting Buttons")]
     public Button btnLightingDay;
     public Button btnLightingNight;
+
+    [Header("Macro Scenario Buttons")]
+    public Button btnBlackout;
+    public Button btnSaturation;
+    public Button btnRecovery;
+
+    [Header("Other Buttons")]
+    public Button btnResetMetrics;
 
     private SimulationManager _sim;
 
@@ -44,128 +57,162 @@ public class DashboardController : MonoBehaviour
             return;
         }
 
-        // Wire buttons
+        WireButtons();
+        StyleAllText();
+        Debug.Log("[Dashboard] Ready.");
+    }
+
+    private void WireButtons()
+    {
+        // Clear all listeners first
+        btnGreedy?.onClick.RemoveAllListeners();
+        btnAI?.onClick.RemoveAllListeners();
+        btnMARLPatrol?.onClick.RemoveAllListeners();
+        btnAddPolice?.onClick.RemoveAllListeners();
+        btnRemovePolice?.onClick.RemoveAllListeners();
+        btnLightingDay?.onClick.RemoveAllListeners();
+        btnLightingNight?.onClick.RemoveAllListeners();
+        btnBlackout?.onClick.RemoveAllListeners();
+        btnSaturation?.onClick.RemoveAllListeners();
+        btnRecovery?.onClick.RemoveAllListeners();
+        btnResetMetrics?.onClick.RemoveAllListeners();
+
+        // Wire fresh
         btnGreedy?.onClick.AddListener(() => _sim.SetPatrolModeGreedy());
         btnAI?.onClick.AddListener(() => _sim.SetPatrolModeAI());
+        btnMARLPatrol?.onClick.AddListener(() => _sim.SetPatrolModeMARL());
         btnAddPolice?.onClick.AddListener(() => _sim.AddOnePolice());
         btnRemovePolice?.onClick.AddListener(() => _sim.RemoveOnePolice());
         btnLightingDay?.onClick.AddListener(() => _sim.SetLightingDay());
         btnLightingNight?.onClick.AddListener(() => _sim.SetLightingNight());
+        btnBlackout?.onClick.AddListener(() => _sim.TriggerBlackout());
+        btnSaturation?.onClick.AddListener(() => _sim.TriggerSaturation());
+        btnRecovery?.onClick.AddListener(() => _sim.TriggerRecovery());
+        btnResetMetrics?.onClick.AddListener(() => _sim.ResetMetrics());
 
-        SetupLayout();
+        Debug.Log("[Dashboard] Buttons wired.");
+
+        // Style buttons
+        StyleButton(btnGreedy, new Color(0.10f, 0.25f, 0.70f), "#4488FF", "GREEDY");
+        StyleButton(btnAI, new Color(0.30f, 0.10f, 0.60f), "#AA44FF", "AI PATROL");
+        StyleButton(btnMARLPatrol, new Color(0.50f, 0.10f, 0.40f), "#FF44CC", "MARL");
+        StyleButton(btnAddPolice, new Color(0.05f, 0.35f, 0.15f), "#00FF64", "+ POLICE");
+        StyleButton(btnRemovePolice, new Color(0.45f, 0.05f, 0.05f), "#FF4444", "- POLICE");
+        StyleButton(btnLightingDay, new Color(0.45f, 0.32f, 0.00f), "#FFCC00", "DAY");
+        StyleButton(btnLightingNight, new Color(0.05f, 0.05f, 0.25f), "#4466FF", "NIGHT");
+        StyleButton(btnBlackout, new Color(0.40f, 0.02f, 0.02f), "#FF2222", "BLACKOUT");
+        StyleButton(btnSaturation, new Color(0.02f, 0.08f, 0.40f), "#2255FF", "SATURATION");
+        StyleButton(btnRecovery, new Color(0.02f, 0.35f, 0.10f), "#00FF88", "RECOVERY");
+        StyleButton(btnResetMetrics, new Color(0.20f, 0.20f, 0.20f), "#AAAAAA", "RESET");
     }
 
-    private void SetupLayout()
-    {
-        //  Top Bar 
-        var topBar = simTimeText?.transform.parent;
-        if (topBar != null)
-        {
-            var img = topBar.GetComponent<UnityEngine.UI.Image>();
-            if (img) img.color = new Color(0.05f, 0.05f, 0.10f, 0.92f);
-        }
-
-        // Style all metric texts
-        SetTextStyle(simTimeText, 18, Color.white, FontStyles.Bold);
-        SetTextStyle(tickText, 13, new Color(0.6f, 0.6f, 0.7f), FontStyles.Normal);
-        SetTextStyle(patrolModeText, 13, new Color(0.4f, 0.7f, 1.0f), FontStyles.Bold);
-
-        //  Metrics Panel 
-        SetTextStyle(totalCrimesText, 12, new Color(1.0f, 0.4f, 0.4f), FontStyles.Normal);
-        SetTextStyle(totalCaughtText, 12, new Color(0.4f, 1.0f, 0.5f), FontStyles.Normal);
-        SetTextStyle(catchRateText, 12, new Color(0.6f, 0.4f, 1.0f), FontStyles.Normal);
-        SetTextStyle(avgResponseText, 12, new Color(0.4f, 0.8f, 1.0f), FontStyles.Normal);
-        SetTextStyle(patrolEffText, 12, new Color(1.0f, 0.7f, 0.3f), FontStyles.Normal);
-        SetTextStyle(mlAucText, 12, new Color(0.7f, 0.7f, 0.7f), FontStyles.Normal);
-
-      
-        StyleButton(btnGreedy, "#2255CC", "#4488FF");
-        StyleButton(btnAI, "#552299", "#8844FF");
-        StyleButton(btnAddPolice, "#1A6632", "#33CC66");
-        StyleButton(btnRemovePolice, "#661A1A", "#FF4444");
-        StyleButton(btnLightingDay, "#665500", "#FFCC00");
-        StyleButton(btnLightingNight, "#0A0A33", "#3333AA");
-    }
-
-    private void SetTextStyle(TextMeshProUGUI tmp, int size, Color color, FontStyles style)
-    {
-        if (tmp == null) return;
-        tmp.fontSize = size;
-        tmp.color = color;
-        tmp.fontStyle = style;
-    }
-
-    private void StyleButton(Button btn, string bgHex, string textHex)
+    private void StyleButton(Button btn, Color bgColor, string hexText, string label)
     {
         if (btn == null) return;
 
-        // Background
-        ColorUtility.TryParseHtmlString(bgHex, out Color bg);
-        var img = btn.GetComponent<UnityEngine.UI.Image>();
-        if (img) img.color = new Color(bg.r, bg.g, bg.b, 0.85f);
+        var img = btn.GetComponent<Image>();
+        if (img) img.color = new Color(bgColor.r, bgColor.g, bgColor.b, 0.85f);
 
-        // Text
-        ColorUtility.TryParseHtmlString(textHex, out Color tc);
         var tmp = btn.GetComponentInChildren<TextMeshProUGUI>();
         if (tmp)
         {
-            tmp.color = tc;
-            tmp.fontSize = 12;
+            tmp.text = label;
+            tmp.fontSize = 10;
             tmp.fontStyle = FontStyles.Bold;
+            ColorUtility.TryParseHtmlString(hexText, out Color tc);
+            tmp.color = tc;
         }
 
-        // Hover tint
         var colors = btn.colors;
         colors.normalColor = Color.white;
         colors.highlightedColor = new Color(1.3f, 1.3f, 1.3f);
-        colors.pressedColor = new Color(0.7f, 0.7f, 0.7f);
+        colors.pressedColor = new Color(0.6f, 0.6f, 0.6f);
         btn.colors = colors;
+    }
+
+    private void StyleAllText()
+    {
+        SetStyle(simTimeText, 22, "#FFFFFF", true);
+        SetStyle(tickText, 12, "#AACCDD", false);
+        SetStyle(patrolModeText, 12, "#44AAFF", true);
+        SetStyle(activeScenarioText, 12, "#44FF88", true);
+        SetStyle(totalCrimesText, 14, "#FF4444", true);
+        SetStyle(totalCaughtText, 14, "#00FF64", true);
+        SetStyle(catchRateText, 14, "#AA44FF", true);
+        SetStyle(avgResponseText, 14, "#00D4FF", true);
+        SetStyle(patrolEffText, 14, "#FFAA00", true);
+        SetStyle(mlAucText, 14, "#FF88CC", true);
+    }
+
+    private void SetStyle(TextMeshProUGUI tmp, int size, string hex, bool bold)
+    {
+        if (tmp == null) return;
+        tmp.fontSize = size;
+        tmp.fontStyle = bold ? FontStyles.Bold : FontStyles.Normal;
+        ColorUtility.TryParseHtmlString(hex, out Color c);
+        tmp.color = c;
     }
 
     public void UpdateSimTime(float timeOfDay, int tick)
     {
-        // Format time
         int hour = Mathf.FloorToInt(timeOfDay);
         int min = Mathf.FloorToInt((timeOfDay - hour) * 60);
         string ampm = hour >= 12 ? "PM" : "AM";
         int h12 = hour % 12 == 0 ? 12 : hour % 12;
 
-        if (simTimeText)
-            simTimeText.text = $"{h12}:{min:D2} {ampm}";
-
-        if (tickText)
-            tickText.text = $"Tick {tick}";
+        if (simTimeText) simTimeText.text = $"{h12}:{min:D2} {ampm}";
+        if (tickText) tickText.text = $"Tick {tick:000000}";
     }
 
     public void UpdateMetrics(MetricsResponse m)
     {
         if (m == null) return;
 
-        if (totalCrimesText) totalCrimesText.text = $"Crimes: {m.total_crimes}";
-        if (totalCaughtText) totalCaughtText.text = $"Caught: {m.total_caught}";
-        if (catchRateText) catchRateText.text = $"Rate: {m.catch_rate * 100f:F1}%";
-        if (avgResponseText) avgResponseText.text = $"Response: {m.avg_response_time:F1}t";
-        if (patrolEffText) patrolEffText.text = $"Efficiency: {m.patrol_efficiency * 100f:F1}%";
+        if (totalCrimesText) totalCrimesText.text = m.total_crimes.ToString();
+        if (totalCaughtText) totalCaughtText.text = m.total_caught.ToString();
+        if (catchRateText) catchRateText.text = $"{m.catch_rate * 100f:F1}%";
+        if (avgResponseText) avgResponseText.text = $"{m.avg_response_time:F1}t";
+        if (patrolEffText) patrolEffText.text = $"{m.patrol_efficiency * 100f:F1}%";
 
-        // Patrol mode color coding
         if (patrolModeText)
         {
-            patrolModeText.text = $"MODE: {m.patrol_mode.ToUpper()}";
-            patrolModeText.color = m.patrol_mode switch
+            patrolModeText.text = $"MODE: {m.patrol_mode?.ToUpper()}";
+            string hex = m.patrol_mode switch
             {
-                "ai" => new Color(0.6f, 0.3f, 1.0f),
-                "greedy" => new Color(0.3f, 0.6f, 1.0f),
-                _ => Color.white
+                "ai" => "#AA44FF",
+                "marl" => "#FF44CC",
+                _ => "#44AAFF"
             };
+            ColorUtility.TryParseHtmlString(hex, out Color mc);
+            patrolModeText.color = mc;
         }
 
-        // ML metrics — only show after model trains
         if (mlAucText)
         {
-            if (m.ml_metrics != null && m.ml_metrics.roc_auc > 0)
-                mlAucText.text = $"ML AUC: {m.ml_metrics.roc_auc:F2}";
-            else
-                mlAucText.text = "ML: Training...";
+            mlAucText.text = m.ml_metrics != null && m.ml_metrics.roc_auc > 0
+                ? $"AUC {m.ml_metrics.roc_auc:F2}"
+                : "ML: Training...";
+        }
+    }
+
+    public void UpdateScenario(string scenario)
+    {
+        if (activeScenarioText == null) return;
+
+        switch (scenario)
+        {
+            case "blackout":
+                activeScenarioText.text = "BLACKOUT ACTIVE";
+                activeScenarioText.color = new Color(1f, 0.2f, 0.2f);
+                break;
+            case "saturation":
+                activeScenarioText.text = "EMERGENCY DISPATCH";
+                activeScenarioText.color = new Color(1f, 0.6f, 0.1f);
+                break;
+            default:
+                activeScenarioText.text = "NORMAL OPERATIONS";
+                activeScenarioText.color = new Color(0.2f, 1f, 0.5f);
+                break;
         }
     }
 
@@ -174,57 +221,39 @@ public class DashboardController : MonoBehaviour
         if (logContent == null || _loggedIds.Contains(evt.id)) return;
         _loggedIds.Add(evt.id);
 
-        // Trim old entries safely using DestroyImmediate alternative
         while (logContent.childCount >= _maxLogEntries)
         {
             var oldest = logContent.GetChild(0).gameObject;
-            oldest.transform.SetParent(null); // detach first
-            Destroy(oldest);                  // then destroy
+            oldest.transform.SetParent(null);
+            Destroy(oldest);
         }
 
-        // Build entry from scratch — no prefab needed
-        var entry = new GameObject("LogEntry");
+        var entry = new GameObject("LogEntry_" + evt.id);
         entry.transform.SetParent(logContent, false);
 
-        // Add LayoutElement so VLG sizes it correctly
-        var le = entry.AddComponent<UnityEngine.UI.LayoutElement>();
-        le.preferredHeight = 22;
+        var le = entry.AddComponent<LayoutElement>();
+        le.preferredHeight = 20;
         le.flexibleWidth = 1;
 
-        // Add RectTransform sizing
-        var rect = entry.GetComponent<RectTransform>();
-        rect.sizeDelta = new Vector2(0, 22);
-
-        // Add TMP text
         var tmp = entry.AddComponent<TextMeshProUGUI>();
-
         int hour = Mathf.FloorToInt(evt.time_of_day);
         int min = Mathf.FloorToInt((evt.time_of_day - hour) * 60);
         string ampm = hour >= 12 ? "PM" : "AM";
         int h12 = hour % 12 == 0 ? 12 : hour % 12;
         string status = evt.caught ? "CAUGHT" : "ESCAPED";
 
-        tmp.text = $"{h12}:{min:D2} {ampm}  {evt.type.ToUpper()}  {evt.zone}  {status}";
-        tmp.fontSize = 11;
-        tmp.color = evt.caught
-            ? new Color(0.3f, 1.0f, 0.5f)
-            : new Color(1.0f, 0.3f, 0.3f);
+        tmp.text = $"{h12}:{min:D2}{ampm} {evt.type.ToUpper()} {evt.zone} {status}";
+        tmp.fontSize = 10;
         tmp.fontStyle = FontStyles.Bold;
+        tmp.color = evt.caught
+            ? new Color(0.2f, 1.0f, 0.4f)
+            : new Color(1.0f, 0.3f, 0.3f);
 
-        // Scroll to bottom
-        var scrollRect = logContent.GetComponentInParent<UnityEngine.UI.ScrollRect>();
-        if (scrollRect != null)
+        var sr = logContent.GetComponentInParent<ScrollRect>();
+        if (sr != null)
+        {
             Canvas.ForceUpdateCanvases();
-        scrollRect.verticalNormalizedPosition = 0f;
-    }
-
-    private void StyleButton(Button btn, Color color)
-    {
-        if (btn == null) return;
-        var img = btn.GetComponent<Image>();
-        if (img) img.color = new Color(color.r, color.g, color.b, 0.3f);
-
-        var tmp = btn.GetComponentInChildren<TextMeshProUGUI>();
-        if (tmp) tmp.color = color;
+            sr.verticalNormalizedPosition = 0f;
+        }
     }
 }

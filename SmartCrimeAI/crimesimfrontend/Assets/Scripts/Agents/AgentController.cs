@@ -20,6 +20,7 @@ public class AgentController : MonoBehaviour
     private Dictionary<string, Renderer[]> _agentRenderers = new();
     private Dictionary<string, MinecraftAgentAnimator> _animators = new();
     private Dictionary<string, string> _previousStates = new();
+    private Dictionary<string, AgentBadge> _badges = new();
 
     // State colors for criminal visual feedback
     private static readonly Color ColorScouting = new Color(0.17f, 0.17f, 0.17f);
@@ -88,6 +89,10 @@ public class AgentController : MonoBehaviour
 
         var anim = go.GetComponent<MinecraftAgentAnimator>();
         if (anim != null) _animators[data.id] = anim;
+
+        // Create floating badge
+        var badge = AgentBadge.Create(go.transform, 1.5f);
+        _badges[data.id] = badge;
 
         // Cache renderers for color changes
         _agentRenderers[data.id] = go.GetComponentsInChildren<Renderer>();
@@ -172,6 +177,9 @@ public class AgentController : MonoBehaviour
 
     private void UpdateVisuals(AgentData data)
     {
+        // Update badge
+        if (_badges.TryGetValue(data.id, out var badge))
+            badge.SetState(data.type, data.state);
         // Drive the Minecraft animator
         if (_animators.TryGetValue(data.id, out var anim))
             anim.SetState(data.state);
@@ -262,6 +270,12 @@ public class AgentController : MonoBehaviour
         _agentRenderers.Remove(id);
         _animators.Remove(id);
         _previousStates.Remove(id);
+
+        if (_badges.TryGetValue(id, out var badge))
+        {
+            if (badge != null) Destroy(badge.gameObject);
+            _badges.Remove(id);
+        }
     }
 
     private IEnumerator PlayArrestAndDestroy(string id, GameObject go)

@@ -19,7 +19,11 @@ public class SimulationManager : MonoBehaviour
     [Header("UI")]
     public DashboardController dashboardController;
 
-    // ── Poll intervals  
+    public void SetPatrolModeMARL() { if (apiClient) apiClient.SetPatrolModeMARL(); }
+    public void TriggerBlackout() { if (apiClient) apiClient.TriggerBlackout(); }
+    public void TriggerSaturation() { if (apiClient) apiClient.TriggerSaturation(); }
+    public void TriggerRecovery() { if (apiClient) apiClient.TriggerRecovery(); }
+
     [Header("Poll Settings")]
     [Tooltip("Must match backend SIMULATION_TICK_SLEEP (default 0.5)")]
     public float statePollInterval = 0.5f;
@@ -139,7 +143,13 @@ public class SimulationManager : MonoBehaviour
                 dashboardController.AddCrimeLogEntry(evt);
         }
 
-         
+        if (dashboardController != null)
+        {
+            dashboardController.UpdateSimTime(state.time_of_day, state.tick);
+            dashboardController.UpdateScenario(state.active_scenario);
+        }
+
+
         if (state.tick == _lastTick) return; // skip duplicate ticks 
         _lastTick = state.tick;
     }
