@@ -34,9 +34,7 @@ from config import (
 from simulation.crime_logic import CrimeEvent
 
 
-# ───────────────────────────────────────────────────────────────────────────── #
 #  Helpers
-# ───────────────────────────────────────────────────────────────────────────── #
 
 def _zone_to_rc(zone_id: str):
     """Parse a zone ID like 'A3' into (row, col) integers."""
@@ -50,9 +48,7 @@ def _random_pos_in_zone(zone_col: int, zone_row: int):
     return x, z
 
 
-# ───────────────────────────────────────────────────────────────────────────── #
 #  CivilianAgent
-# ───────────────────────────────────────────────────────────────────────────── #
 
 class CivilianAgent:
     """
@@ -90,8 +86,6 @@ class CivilianAgent:
         else:
             return "residential"  # nighttime home hours
 
-    # ------------------------------------------------------------------ #
-
     def step(
         self,
         environment,
@@ -115,13 +109,13 @@ class CivilianAgent:
         # Activity weight — peaks near 8 AM and 6 PM, trough near 3 AM
         activity_weight = 0.5 + 0.5 * (math.sin((tod - 3) * math.pi / 12) ** 2)
 
-        # ── 1. Currently fleeing ─────────────────────────────────────────
+        # Currently fleeing
         if self.flee_timer > 0:
             self.flee_timer -= 1
             self.state = "fleeing"
             return
 
-        # ── 2. Crime nearby? ─────────────────────────────────────────────
+        # Crime nearby?
         if crime_events_this_tick:
             current_zone = environment.get_zone(self.zone_id)
             nearby_ids = {self.zone_id} | set(current_zone.neighbors)
@@ -132,7 +126,7 @@ class CivilianAgent:
                     self.state = "fleeing"
                     return
 
-        # ── 3. Social influence ──────────────────────────────────────────
+        # Social influence
         if (
             fleeing_count_in_zone >= SOCIAL_INFLUENCE_THRESHOLD
             and random.random() < SOCIAL_INFLUENCE_CHANCE
@@ -141,7 +135,7 @@ class CivilianAgent:
             self.state = "fleeing"
             return
 
-        # ── 4. Normal movement ───────────────────────────────────────────
+        # Normal movement
         current_zone = environment.get_zone(self.zone_id)
         neighbors = current_zone.neighbors
 
@@ -193,7 +187,7 @@ class CivilianAgent:
             else:
                 new_zone_id = self.zone_id
 
-        # ── 5. Move ──────────────────────────────────────────────────────
+        # Move
         if new_zone_id != self.zone_id:
             old_zone = environment.get_zone(self.zone_id)
             old_zone.population = max(0, old_zone.population - 1)
@@ -207,9 +201,7 @@ class CivilianAgent:
         self.state = "walking"
 
 
-# ───────────────────────────────────────────────────────────────────────────── #
 #  CriminalAgent
-# ───────────────────────────────────────────────────────────────────────────── #
 
 class CriminalAgent:
     """
@@ -231,8 +223,6 @@ class CriminalAgent:
         self.safe_zones: Set[str] = set()
         self.caught_count: int = 0
 
-    # ------------------------------------------------------------------ #
-
     @staticmethod
     def _opportunity_score(zone) -> float:
         """Compute how attractive *zone* is for committing a crime with latent variables and noise."""
@@ -252,8 +242,6 @@ class CriminalAgent:
         
         return max(0.0, min(1.0, base_opp + latent_factor + noise))
 
-    # ------------------------------------------------------------------ #
-
     def step(self, environment, crime_log, total_crimes_ref: Optional[list] = None) -> Optional[CrimeEvent]:
         """
         Execute one simulation tick for this criminal.
@@ -271,7 +259,7 @@ class CriminalAgent:
         CrimeEvent | None
             The crime event if a crime was committed this tick.
         """
-        # ── 1. Laying low ────────────────────────────────────────────────
+        # Laying low
         if self.lay_low_timer > 0:
             self.lay_low_timer -= 1
             if self.lay_low_timer == 0:
@@ -279,7 +267,7 @@ class CriminalAgent:
             self.state = "laying_low"
             return None
 
-        # ── 1b. Committing crime (duration lock) ─────────────────────────
+        # Committing crime (duration lock)
         if self.commit_timer > 0:
             # Check if police arrived in our zone while we were committing!
             zone = environment.get_zone(self.zone_id)
@@ -305,7 +293,7 @@ class CriminalAgent:
 
         zone = environment.get_zone(self.zone_id);
 
-        # ── 2. Police presence → flee ────────────────────────────────────
+        # Police presence → flee
         police_nearby = zone.police_count > 0 or any(
             environment.get_zone(n).police_count > 0 for n in zone.neighbors
         )
@@ -330,7 +318,7 @@ class CriminalAgent:
                 self._move_to(best, environment)
             return None
 
-        # ── 3. Opportunity check ─────────────────────────────────────────
+        # Opportunity check
         opp = self._opportunity_score(zone)
         if opp > CRIME_OPPORTUNITY_THRESHOLD and self.zone_id not in self.hot_zones:
             event = self.attempt_crime(environment, crime_log)
@@ -338,7 +326,7 @@ class CriminalAgent:
                 total_crimes_ref[0] += 1
             return event
 
-        # ── 4. Move toward best opportunity neighbor ─────────────────────
+        # Move toward best opportunity neighbor
         best_neighbor = None
         best_opp = -1.0
         for n in zone.neighbors:
@@ -355,8 +343,6 @@ class CriminalAgent:
 
         self.state = "scouting"
         return None
-
-    # ------------------------------------------------------------------ #
 
     def attempt_crime(self, environment, crime_log) -> Optional[CrimeEvent]:
         """
@@ -403,8 +389,6 @@ class CriminalAgent:
         self.commit_timer = 3
         return event
 
-    # ------------------------------------------------------------------ #
-
     def _move_to(self, new_zone_id: str, environment) -> None:
         """Move to *new_zone_id*, updating environment counts and position."""
         old_zone = environment.get_zone(self.zone_id)
@@ -416,9 +400,7 @@ class CriminalAgent:
         self.x, self.z = _random_pos_in_zone(new_col, new_row)
 
 
-# ───────────────────────────────────────────────────────────────────────────── #
 #  PoliceAgent
-# ───────────────────────────────────────────────────────────────────────────── #
 
 class PoliceAgent:
     """
@@ -438,8 +420,6 @@ class PoliceAgent:
         self.responding_to: Optional[Dict] = None  # {crime_id, zone_id, tick}
         self.response_log: List[dict] = []
 
-    # ------------------------------------------------------------------ #
-
     def step(self, environment, crime_log) -> None:
         """
         Execute one simulation tick for this officer.
@@ -449,7 +429,7 @@ class PoliceAgent:
         environment : CityEnvironment
         crime_log : CrimeLog
         """
-        # ── 1. Pick up unassigned crime if idle ──────────────────────────
+        # Pick up unassigned crime if idle
         if self.responding_to is None:
             unassigned = crime_log.get_unassigned_crimes()
             if unassigned:
@@ -462,7 +442,7 @@ class PoliceAgent:
                 }
                 self.state = "responding"
 
-        # ── 2. Responding to a crime ─────────────────────────────────────
+        # Responding to a crime
         if self.state == "responding" and self.responding_to is not None:
             target_zone_id = self.responding_to["zone_id"]
 
@@ -492,7 +472,7 @@ class PoliceAgent:
                         self._change_zone(next_zone, environment)
             return
 
-        # ── 3. Patrolling ────────────────────────────────────────────────
+        # Patrolling
         if self.state == "patrolling":
             if not self.patrol_route:
                 # No route assigned — stay put
@@ -504,9 +484,8 @@ class PoliceAgent:
             if next_zone != self.zone_id:
                 self._change_zone(next_zone, environment)
 
-    # ------------------------------------------------------------------ #
     #  Helpers
-    # ------------------------------------------------------------------ #
+
     def _move_toward(self, target_zone_id: str, environment) -> str:
         """
         Return the neighbouring zone_id that brings us closest to *target*

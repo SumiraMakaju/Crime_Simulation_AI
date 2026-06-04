@@ -56,11 +56,11 @@ import uvicorn
 def main() -> None:  # noqa: C901 — intentionally monolithic orchestrator
     """Bootstrap every subsystem and run the simulation loop forever."""
 
-    #  1. Initialise environment 
+    #  Initialise environment 
     env = CityEnvironment(rows=GRID_ROWS, cols=GRID_COLS)
     print(f"[INIT] City grid created: {GRID_ROWS}×{GRID_COLS} ({len(env.zone_ids)} zones)")
 
-    #  2. Spawn agents at random zones 
+    #  Spawn agents at random zones 
     zone_ids = list(env.zone_ids)
 
     residential_zones = [z.zone_id for z in env.zones.values() if z.zone_type == "residential"]
@@ -102,14 +102,14 @@ def main() -> None:  # noqa: C901 — intentionally monolithic orchestrator
         f"criminals: {len(criminals)}, police: {len(police)}"
     )
 
-    #  3. Support objects 
+    #  Support objects 
     crime_log = CrimeLog()
     metric_logger = MetricLogger()
     scenario_engine = ScenarioEngine(
         env, civilians, criminals, police, crime_log, metric_logger
     )
 
-    #  4. ML pipeline 
+    #  ML pipeline 
     trainer = ModelTrainer()
     loaded_ml = trainer.load()  # attempt to load saved model
     if loaded_ml:
@@ -128,7 +128,7 @@ def main() -> None:  # noqa: C901 — intentionally monolithic orchestrator
     predictor.set_trainer(trainer)
     predictor.set_gnn_trainer(gnn_trainer)
 
-    #  5. Patrol optimizers 
+    #  Patrol optimizers 
     greedy_optimizer = GreedyPatrolOptimizer()
     rl_agent = PatrolRLAgent()
     expected_n_zones = len(env.zone_ids)
@@ -168,7 +168,7 @@ def main() -> None:  # noqa: C901 — intentionally monolithic orchestrator
 
     patrol_routes: dict[str, list[str]] = {}
 
-    #  6. Wire up SimulationState and start API server 
+    #  Wire up SimulationState and start API server 
     sim_state = SimulationState()
     sim_state.environment = env
     sim_state.civilians = civilians
@@ -204,14 +204,14 @@ def main() -> None:  # noqa: C901 — intentionally monolithic orchestrator
         except Exception as exc:
             print(f"[INIT] Could not count CSV lines on startup: {exc}")
 
-    #  7. Main simulation loop 
+    #  Main simulation loop 
     try:
         while True:
             with sim_state.lock:
-                # a. Advance tick
+                # Advance tick
                 env.advance_tick()
 
-                # b. Step civilians 
+                # Step civilians 
                 # Collect crime events from last tick for awareness
                 crime_events_this_tick = [
                     e for e in crime_log.events if getattr(e, "tick", None) == env.tick - 1
@@ -226,7 +226,7 @@ def main() -> None:  # noqa: C901 — intentionally monolithic orchestrator
                 for civ in civilians:
                     civ.step(env, crime_events_this_tick, fleeing_counts.get(civ.zone_id, 0))
 
-                # c. Step criminals 
+                # Step criminals 
                 new_crimes: list = []
                 for crim in criminals:
                     event = crim.step(env, crime_log)
@@ -234,7 +234,7 @@ def main() -> None:  # noqa: C901 — intentionally monolithic orchestrator
                         new_crimes.append(event)
                         metric_logger.log_crime(caught=False, response_time=None)
 
-                # d. ML prediction 
+                # ML prediction 
                 if env.tick % PREDICTION_INTERVAL == 0 and getattr(predictor, "is_ready", False):
                     try:
                         predictions = predictor.predict_all(env)
@@ -242,7 +242,7 @@ def main() -> None:  # noqa: C901 — intentionally monolithic orchestrator
                     except Exception as exc:
                         print(f"  [ML] Prediction error: {exc}")
 
-                # e. Patrol optimisation 
+                # Patrol optimisation 
                 if env.tick % PATROL_UPDATE_INTERVAL == 0:
                     patrol_mode = getattr(scenario_engine, "patrol_mode", "greedy")
 
@@ -268,7 +268,7 @@ def main() -> None:  # noqa: C901 — intentionally monolithic orchestrator
 
                     sim_state.patrol_routes = patrol_routes
 
-                # f. Step police 
+                # Step police 
                 for p in police:
                     p.step(env, crime_log)
                     zone = env.get_zone(p.zone_id)
@@ -276,7 +276,7 @@ def main() -> None:  # noqa: C901 — intentionally monolithic orchestrator
                         zone.risk_score > PATROL_EFFICIENCY_RISK_THRESHOLD
                     )
 
-                # g. Check for caught crimes (immediate intercepts) 
+                # Check for caught crimes (immediate intercepts) 
                 for event in new_crimes:
                     zone = env.get_zone(event.zone_id)
                     if zone.police_count > 0:
@@ -308,7 +308,7 @@ def main() -> None:  # noqa: C901 — intentionally monolithic orchestrator
                         patrol_mode = getattr(scenario_engine, "patrol_mode", "greedy")
                         metric_logger.mode_counters[patrol_mode]["caught"] += new_catches
 
-                # h. Online retrain check 
+                # Online retrain check 
                 # Track dataset size in memory to prevent expensive synchronous disk reads inside the lock
                 dataset_size = initial_dataset_size + (len(crime_log.events) * 3)
                 if dataset_size >= ML_MIN_ROWS and trainer.should_retrain(dataset_size):

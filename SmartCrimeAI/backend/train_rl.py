@@ -31,7 +31,7 @@ def main():
     civs = [CivilianAgent(f"train_civ_{i}", "A0", 0, 0) for i in range(30)]
     crims = [CriminalAgent(f"train_crim_{i}", "A0", 0, 0) for i in range(5)]
 
-    # --- 1. Train Centralized RL Agent ---
+    # Train Centralized RL Agent
     print("\n" + "-" * 50)
     print(" [1/2] Training Centralized RL Agent (Single PPO)")
     print("-" * 50)
@@ -42,7 +42,7 @@ def main():
     except Exception as e:
         print(f"[ERROR] Failed to train Centralized RL: {e}")
 
-    # --- 2. Train MARL Coordinator ---
+    # Train MARL Coordinator
     print("\n" + "-" * 50)
     print(" [2/2] Training Multi-Agent Coordinator (IPPO Co-op)")
     print("-" * 50)

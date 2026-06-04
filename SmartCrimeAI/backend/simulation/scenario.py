@@ -64,9 +64,7 @@ class ScenarioEngine:
         self.patrol_mode: str = "greedy"
         self.active_scenario: str = "normal"
 
-    # ------------------------------------------------------------------ #
     #  Public API
-    # ------------------------------------------------------------------ #
     def apply(self, config: dict) -> dict:
         """
         Apply every key in *config* and return a summary dict.
@@ -133,9 +131,7 @@ class ScenarioEngine:
             "changes": changes,
         }
 
-    # ------------------------------------------------------------------ #
     #  Handlers
-    # ------------------------------------------------------------------ #
     def _add_police(self, n: int) -> None:
         """Spawn *n* new PoliceAgent instances at random zones."""
         existing_count = len(self.police)
