@@ -17,7 +17,7 @@ from config import (
     GNN_MODEL_PATH,
 )
 
-# ─── Pure PyTorch Graph Convolutional Network Layer ──────────────────────────
+# Pure PyTorch Graph Convolutional Network Layer 
 
 class GCNLayer(nn.Module):
     """Symmetric GCN Propagation Layer: H' = σ(A_hat * H * W)"""
@@ -62,7 +62,7 @@ class CrimeGCN(nn.Module):
             return logits
         return torch.sigmoid(logits)
 
-# ─── Graph Construction and Training ──────────────────────────────────────────
+#  Graph Construction and Training 
 
 class CityGraphBuilder:
     """Helper to convert the grid city environment and dataset into GNN graph structures."""

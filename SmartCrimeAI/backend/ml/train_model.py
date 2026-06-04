@@ -39,9 +39,8 @@ class ModelTrainer:
         self.X_test = None
         self.y_test = None
 
-    # ------------------------------------------------------------------ #
     #  Training                                                            #
-    # ------------------------------------------------------------------ #
+   
     def train(self, X, y) -> dict:
         """Train both models on *(X, y)* with an 80/20 train-test split.
 
@@ -80,9 +79,9 @@ class ModelTrainer:
         names = FeatureExtractor.feature_columns()
         return names, list(importances)
 
-    # ------------------------------------------------------------------ #
+  
     #  Evaluation                                                          #
-    # ------------------------------------------------------------------ #
+    
     def evaluate(self, X_test, y_test) -> dict:
         """Compute and store classification metrics.
 
@@ -119,9 +118,9 @@ class ModelTrainer:
         }
         return self.eval_metrics
 
-    # ------------------------------------------------------------------ #
+  
     #  Persistence                                                         #
-    # ------------------------------------------------------------------ #
+   
     def save(self, path: str | None = None) -> None:
         """Serialize both models to disk.
 
@@ -169,9 +168,9 @@ class ModelTrainer:
         print("[ModelTrainer] Model files not found — skipping load.")
         return False
 
-    # ------------------------------------------------------------------ #
+
     #  Online / incremental retraining                                     #
-    # ------------------------------------------------------------------ #
+   
     def online_retrain(self, X, y) -> dict:
         """Retrain on the full accumulated dataset.
 

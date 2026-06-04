@@ -21,9 +21,9 @@ class CrimePredictor:
         self.extractor: FeatureExtractor = FeatureExtractor()
         self.is_ready: bool = False
 
-    # ------------------------------------------------------------------ #
+
     #  Model loading / injection                                           #
-    # ------------------------------------------------------------------ #
+    
     def load(self, path: str | None = None) -> bool:
         """Create a :class:`ModelTrainer` and attempt to load persisted
         models from disk.
@@ -63,9 +63,7 @@ class CrimePredictor:
         """Inject an already-trained :class:`GNNTrainer`."""
         self.gnn_trainer = gnn_trainer
 
-    # ------------------------------------------------------------------ #
-    #  Prediction                                                          #
-    # ------------------------------------------------------------------ #
+    #  Prediction                                               
     def predict_all(self, environment) -> dict:
         """Predict crime risk for every zone in *environment*.
 
@@ -130,9 +128,9 @@ class CrimePredictor:
 
         return results
 
-    # ------------------------------------------------------------------ #
+
     #  Environment feedback                                                #
-    # ------------------------------------------------------------------ #
+    
     @staticmethod
     def update_environment(environment, predictions: dict) -> None:
         """Write prediction results back into the environment's zones.

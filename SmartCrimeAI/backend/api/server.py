@@ -13,9 +13,8 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Simulation state container (shared between the simulation loop and the API)
-# ─────────────────────────────────────────────────────────────────────────────
+
 
 class SimulationState:
     """Thread-safe container that holds references to every shared object.
@@ -111,9 +110,8 @@ class SimulationState:
                 pass
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Helpers
-# ─────────────────────────────────────────────────────────────────────────────
+
 
 def _to_native(value: Any) -> Any:
     """Convert numpy scalars / arrays to plain Python types for JSON."""
@@ -175,9 +173,7 @@ def _crime_event_dict(event: Any) -> Dict[str, Any]:
     }
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Application factory
-# ─────────────────────────────────────────────────────────────────────────────
 
 def create_app(sim_state: SimulationState) -> FastAPI:
     """Build and return a fully-configured FastAPI application."""
@@ -197,12 +193,12 @@ def create_app(sim_state: SimulationState) -> FastAPI:
         version="1.0.0",
     )
 
-    # --- Mount Static Reports Directory -----------------------------------
+    # Mount Static Reports Directory 
     import os
     os.makedirs("output/reports", exist_ok=True)
     app.mount("/reports", StaticFiles(directory="output/reports"), name="reports")
 
-    # --- CORS middleware (allow everything for development) ---------------
+    # CORS middleware (allow everything for development) 
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],
@@ -211,7 +207,7 @@ def create_app(sim_state: SimulationState) -> FastAPI:
         allow_headers=["*"],
     )
 
-    # ── WebSocket /ws/state ──────────────────────────────────────────────
+    # WebSocket /ws/state 
 
     @app.websocket("/ws/state")
     async def websocket_state(websocket: WebSocket):
@@ -230,7 +226,7 @@ def create_app(sim_state: SimulationState) -> FastAPI:
             if websocket in sim_state.ws_clients:
                 sim_state.ws_clients.remove(websocket)
 
-    # ── GET /state ──────────────────────────────────────────────────────
+    # GET /state 
 
     @app.get("/state")
     def get_state() -> Dict[str, Any]:
@@ -273,7 +269,7 @@ def create_app(sim_state: SimulationState) -> FastAPI:
                 "crime_events": crime_events,
             }
 
-    # ── GET /hotspots ───────────────────────────────────────────────────
+    # GET /hotspots 
 
     @app.get("/hotspots")
     def get_hotspots() -> List[Dict[str, Any]]:
@@ -287,7 +283,7 @@ def create_app(sim_state: SimulationState) -> FastAPI:
                     result.append(_zone_dict(zone))
             return result
 
-    # ── GET /patrol-routes ──────────────────────────────────────────────
+    # GET /patrol-routes 
 
     @app.get("/patrol-routes")
     def get_patrol_routes() -> Dict[str, List[str]]:
@@ -298,7 +294,7 @@ def create_app(sim_state: SimulationState) -> FastAPI:
                 for k, v in sim_state.patrol_routes.items()
             }
 
-    # ── GET /metrics ────────────────────────────────────────────────────
+    # GET /metrics 
 
     @app.get("/metrics")
     def get_metrics() -> Dict[str, Any]:
@@ -318,7 +314,7 @@ def create_app(sim_state: SimulationState) -> FastAPI:
                 }
             return metrics
 
-    # ── GET /crime-events ───────────────────────────────────────────────
+    # GET /crime-events 
 
     @app.get("/crime-events")
     def get_crime_events(
@@ -331,7 +327,7 @@ def create_app(sim_state: SimulationState) -> FastAPI:
             recent = sim_state.crime_log.get_recent(limit)
             return [_crime_event_dict(ev) for ev in recent]
 
-    # ── GET /reports ────────────────────────────────────────────────────
+    # GET /reports 
 
     @app.get("/reports")
     def get_reports() -> Dict[str, Any]:
@@ -347,7 +343,7 @@ def create_app(sim_state: SimulationState) -> FastAPI:
                 pass
         return {"error": "No reports generated yet. Run some simulation ticks to trigger retrains."}
 
-    # ── GET /training-history ───────────────────────────────────────────
+    # GET /training-history 
 
     @app.get("/training-history")
     def get_training_history() -> List[Dict[str, Any]]:
@@ -363,7 +359,7 @@ def create_app(sim_state: SimulationState) -> FastAPI:
                 pass
         return []
 
-    # ── POST /scenario ──────────────────────────────────────────────────
+    # POST /scenario 
 
     @app.post("/scenario")
     def apply_scenario(body: Dict[str, Any]) -> Dict[str, Any]:
@@ -377,7 +373,7 @@ def create_app(sim_state: SimulationState) -> FastAPI:
             except Exception as exc:  # noqa: BLE001
                 return {"status": "error", "detail": str(exc)}
 
-    # ── POST /scenario/blackout ──────────────────────────────────────────
+    # POST /scenario/blackout 
     @app.post("/scenario/blackout")
     def trigger_blackout() -> Dict[str, Any]:
         """Trigger the Midnight Grid Failure (Blackout) macro scenario."""
@@ -396,7 +392,7 @@ def create_app(sim_state: SimulationState) -> FastAPI:
             except Exception as exc:
                 return {"status": "error", "detail": str(exc)}
 
-    # ── POST /scenario/saturation ────────────────────────────────────────
+    #  POST /scenario/saturation 
     @app.post("/scenario/saturation")
     def trigger_saturation() -> Dict[str, Any]:
         """Trigger the Emergency Night Coordinated Dispatch macro scenario."""
@@ -433,7 +429,7 @@ def create_app(sim_state: SimulationState) -> FastAPI:
             except Exception as exc:
                 return {"status": "error", "detail": str(exc)}
 
-    # ── GET / (HTML Dashboard) ──────────────────────────────────────────
+    # GET / (HTML Dashboard) 
 
     @app.get("/", response_class=HTMLResponse)
     def serve_dashboard() -> str:
@@ -443,9 +439,11 @@ def create_app(sim_state: SimulationState) -> FastAPI:
     return app
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+
+
+
 # Built-in High-Fidelity Web Dashboard (HTML / CSS / JS)
-# ─────────────────────────────────────────────────────────────────────────────
+
 
 DASHBOARD_HTML = """<!DOCTYPE html>
 <html lang="en">

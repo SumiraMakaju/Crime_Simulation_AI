@@ -5,7 +5,7 @@ import pandas as pd
 from config import DATASET_CSV
 
 
-# ─── Ordered feature column names ──────────────────────────────────────────────
+#  Ordered feature column names 
 _ZONE_TYPE_DUMMIES = [
     "zone_type_residential",
     "zone_type_commercial",
@@ -31,17 +31,15 @@ _FEATURE_COLUMNS = [
 class FeatureExtractor:
     """Converts a zone + environment snapshot into a flat feature dictionary."""
 
-    # ------------------------------------------------------------------ #
-    #  Public helpers                                                      #
-    # ------------------------------------------------------------------ #
+
+    #  Public helpers                                                 
     @staticmethod
     def feature_columns() -> list[str]:
         """Return the ordered list of feature names used by the model."""
         return list(_FEATURE_COLUMNS)
 
-    # ------------------------------------------------------------------ #
-    #  Core extraction                                                     #
-    # ------------------------------------------------------------------ #
+
+    #  Core extraction                                               
     @staticmethod
     def extract(zone, environment) -> dict:
         """Build a feature dictionary from a *zone* object and an
@@ -85,7 +83,7 @@ class FeatureExtractor:
         }
 
 
-# ─── Dataset loader ────────────────────────────────────────────────────────────
+# Dataset loader
 
 def load_dataset(path: str = DATASET_CSV) -> tuple[pd.DataFrame, pd.Series]:
     """Load the crime dataset CSV and return *(X, y)*.
@@ -108,7 +106,7 @@ def load_dataset(path: str = DATASET_CSV) -> tuple[pd.DataFrame, pd.Series]:
     """
     df = pd.read_csv(path)
 
-    # ── One-hot encode zone_type ──────────────────────────────────────
+    # One-hot encode zone_type 
     if "zone_type" in df.columns:
         dummies = pd.get_dummies(df["zone_type"], prefix="zone_type")
         df = pd.concat([df.drop(columns=["zone_type"]), dummies], axis=1)
@@ -118,10 +116,10 @@ def load_dataset(path: str = DATASET_CSV) -> tuple[pd.DataFrame, pd.Series]:
         if col not in df.columns:
             df[col] = 0
 
-    # ── Fill missing values ───────────────────────────────────────────
+    # Fill missing values 
     df = df.fillna(0)
 
-    # ── Build X, y ────────────────────────────────────────────────────
+    # Build X, y 
     y = df["crime_occurred"].astype(int)
     X = df[_FEATURE_COLUMNS].copy()
 
