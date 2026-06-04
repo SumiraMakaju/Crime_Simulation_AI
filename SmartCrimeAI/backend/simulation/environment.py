@@ -63,9 +63,8 @@ class CityEnvironment:
     - Serialisable snapshot for the API layer
     """
 
-    # --------------------------------------------------------------------- #
     #  Construction
-    # --------------------------------------------------------------------- #
+
     def __init__(self, rows: int = GRID_ROWS, cols: int = GRID_COLS) -> None:
         self.rows: int = rows
         self.cols: int = cols
@@ -115,18 +114,15 @@ class CityEnvironment:
         # Persist zone layout for Unity / shared consumers
         self._write_zone_config()
 
-    # --------------------------------------------------------------------- #
+    
     #  Tick advancement
-    # --------------------------------------------------------------------- #
     def advance_tick(self) -> None:
         """Advance the simulation by one tick and update derived state."""
         self.tick += 1
         self.time_of_day = (START_HOUR + self.tick / TICKS_PER_HOUR) % 24.0
         self._apply_lighting()
 
-    # --------------------------------------------------------------------- #
     #  Queries
-    # --------------------------------------------------------------------- #
     def get_zone(self, zone_id: str) -> Zone:
         """Return the Zone object for *zone_id*."""
         return self.zones[zone_id]
@@ -171,9 +167,7 @@ class CityEnvironment:
         """Return the total police_count across all adjacent zones."""
         return sum(self.zones[n].police_count for n in self.zones[zone_id].neighbors)
 
-    # --------------------------------------------------------------------- #
     #  Internal helpers
-    # --------------------------------------------------------------------- #
     @staticmethod
     def _rc_to_id(row: int, col: int) -> str:
         """Convert (row, col) to a zone ID like 'A3'."""
@@ -229,4 +223,3 @@ class CityEnvironment:
 
         with open(ZONE_CONFIG_JSON, "w", encoding="utf-8") as fh:
             json.dump(config_data, fh, indent=2)
-
