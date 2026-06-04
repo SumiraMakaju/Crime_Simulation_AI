@@ -13,7 +13,7 @@ When the Python backend is running, it hosts a built-in, interactive web dashboa
 ### Discrete-Agent Simulation
 The simulation loop runs a discrete-time model containing three primary agent types whose behaviors are driven by dynamic environmental factors:
 * **Civilian Agents:** Civilians commute between residential, commercial, park, and intersection zones. They follow a diurnal schedule with morning (6:00 AM to 9:00 AM) and evening (5:00 PM to 8:00 PM) peaks to simulate rush hours. They are highly sensitive to crime: witnessing a crime triggers a flee state, which can propagate to neighboring civilians via a herd-fleeing social influence mechanic.
-* **Criminal Agents:** Criminals actively scout zones. They calculate a real-time opportunity score based on poor lighting, low police presence, and civilian density.The score isn't perfectly robotic. The code adds a random Gaussian curve (random noise) to the score. If a zone exceeds their opportunity threshold, they commit a crime (e.g. theft, assault, vandalism, or burglary). If caught by the police, they lay low for a set duration to simulate penalization.
+* **Criminal Agents:** Criminals actively scout zones. They calculate a real-time opportunity score based on poor lighting, low police presence, and civilian density. The score isn't perfectly robotic. The code adds a random Gaussian curve (random noise) to the score. If a zone exceeds their opportunity threshold, they commit a crime (e.g. theft, assault, vandalism, or burglary). If caught by the police, they lay low for a set duration to simulate penalization.
 * **Police Agents:** Police officers patrol the city grid and respond to dispatches. When a crime is reported, they enter a high-priority dispatch state, calculating the shortest Manhattan distance path to the incident zone to intercept the criminal within a tight response window.
 
 ### Dual Machine Learning Predictors
@@ -25,7 +25,7 @@ To model crime risk, the backend trains two separate models in the background:
 ### Multi-Agent Patrol Optimization
 The simulation supports multiple patrol routing strategies to allow direct performance comparisons:
 * **Greedy Patrol Optimizer:** Dynamically sorts all zones by predicted risk, assigning the highest-risk zones as primary routes to available officers while ensuring routes remain disjoint.
-* **Reinforcement Learning (RL/MARL):** Features both a centralized PPO(Proximal Policy Optimization) model (using Stable-Baselines3) and a decentralized Multi-Agent Reinforcement Learning (MARL) coordinator. The MARL coordinator trains multiple police units using custom observation spaces (including zone risk, police coverage, and path overlap) to achieve collaborative city-wide coverage without redundant patrolling.
+* **Reinforcement Learning (RL/MARL):** Features both a centralized PPO (Proximal Policy Optimization) model (using Stable-Baselines3) and a decentralized Multi-Agent Reinforcement Learning (MARL) coordinator. The MARL coordinator trains multiple police units using custom observation spaces (including zone risk, police coverage, and path overlap) to achieve collaborative city-wide coverage without redundant patrolling.
 
 ### Real-Time Visualization
 The Unity 3D frontend provides immersive visual feedback:

@@ -11,7 +11,7 @@ class GreedyPatrolOptimizer:
     """Assigns patrol routes to police agents by greedily picking the
     highest-risk zones while avoiding overlap on primary assignments."""
 
-    # ── public API ──────────────────────────────────────────────────────
+    # public API
 
     def optimize(
         self,
@@ -33,7 +33,7 @@ class GreedyPatrolOptimizer:
         if not police_agents or not environment:
             return {}
 
-        # --- gather and rank zones -------------------------------------------
+        # gather and rank zones
         all_zones = self._get_sorted_zones(environment)
         if not all_zones:
             return {}
@@ -59,8 +59,7 @@ class GreedyPatrolOptimizer:
 
         return patrol_routes
 
-    # ── internals ───────────────────────────────────────────────────────
-
+    # internals
     @staticmethod
     def _get_sorted_zones(environment: Any) -> List[Any]:
         """Return all zones sorted by composite score (RF risk + GNN hotspot) descending."""
@@ -86,7 +85,7 @@ class GreedyPatrolOptimizer:
         """
         route: List[str] = []
 
-        # --- 1. pick primary zone (highest-risk, not yet a primary) ----------
+        # Pick primary zone (highest-risk, not yet a primary)
         primary_zone = None
         for zone in all_zones:
             if zone.zone_id not in assigned_primary:
@@ -101,7 +100,7 @@ class GreedyPatrolOptimizer:
         assigned_primary.add(primary_zone.zone_id)
         assigned_any.add(primary_zone.zone_id)
 
-        # --- 2. fill route from adjacent high-risk zones ---------------------
+        # Fill route from adjacent high-risk zones
         adj_ids = primary_zone.neighbors if hasattr(primary_zone, "neighbors") else []
         if adj_ids:
             adj_zones = [environment.get_zone(zid) for zid in adj_ids]
@@ -114,7 +113,7 @@ class GreedyPatrolOptimizer:
                     route.append(z.zone_id)
                     assigned_any.add(z.zone_id)
 
-        # --- 3. fall back to global top zones if route is still short --------
+        # Fall back to global top zones if route is still short
         for zone in all_zones:
             if len(route) >= GREEDY_ROUTE_LENGTH:
                 break

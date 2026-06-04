@@ -26,8 +26,7 @@ from config import (
     MARL_REWARD_COVERAGE,
 )
 
-# ─── Agent-Centric Local Gym Environment ──────────────────────────────────────
-
+# Agent-Centric Local Gym Environment
 class MARLPatrolEnv(gym.Env):
     """
     Agent-centric Gym Environment representing the police patrol simulation from the perspective
@@ -176,7 +175,7 @@ class MARLPatrolEnv(gym.Env):
         criminals = self.live_criminals if self.live_criminals else self.criminals
         crime_log = self.live_crime_log if self.live_crime_log else self.crime_log
         
-        # 1. Apply action to the focal agent (index 0)
+        # Apply action to the focal agent (index 0)
         focal_agent = police[0]
         focal_zone = env.get_zone(focal_agent.zone_id)
         if action > 0 and (action - 1) < len(focal_zone.neighbors):
@@ -191,7 +190,7 @@ class MARLPatrolEnv(gym.Env):
             focal_agent.z = random.uniform(target_zone.row * 10, (target_zone.row + 1) * 10)
             focal_agent.state = "patrolling"
 
-        # 2. Simulate decisions for other cooperative officers (index > 0)
+        # Simulate decisions for other cooperative officers (index > 0)
         # Using current policy (if available) or random choice as baseline
         tod = env.time_of_day
         for i in range(1, len(police)):
@@ -217,7 +216,7 @@ class MARLPatrolEnv(gym.Env):
                 other_agent.z = random.uniform(target_zone.row * 10, (target_zone.row + 1) * 10)
                 other_agent.state = "patrolling"
                 
-        # 3. Advance simulation by one tick
+        # Advance simulation by one tick
         env.advance_tick()
         
         # Notify civilians
@@ -241,7 +240,7 @@ class MARLPatrolEnv(gym.Env):
             if event_zone.police_count > 0:
                 crime_log.mark_caught(event.crime_id, response_time=1)
                 
-        # 4. Calculate local agent reward for focal officer
+        # Calculate local agent reward for focal officer
         reward = 0.0
         focal_current_zone = env.get_zone(focal_agent.zone_id)
         
@@ -268,7 +267,7 @@ class MARLPatrolEnv(gym.Env):
         obs = self._get_local_obs(0, env, police, env.time_of_day)
         return obs, reward, terminated, truncated, {}
 
-# ─── Multi-Agent RL Coordinator ─────────────────────────────────────────────
+# Multi-Agent RL Coordinator
 
 class MARLCoordinator:
     """Coordinates Multi-Agent Reinforcement Learning policy training and routing."""

@@ -21,11 +21,7 @@ from config import (
     HOTSPOT_RISK_THRESHOLD,
 )
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Gymnasium environment
-# ─────────────────────────────────────────────────────────────────────────────
-
+# Gymnasium environment``
 class PatrolEnv(gymnasium.Env):
     """Custom Gymnasium environment for patrol-route optimization.
 
@@ -73,8 +69,7 @@ class PatrolEnv(gymnasium.Env):
         # Cache sorted zone ids for deterministic ordering
         self._sorted_zone_ids: List[str] = sorted(environment.zone_ids)
 
-    # ── observation helper ──────────────────────────────────────────────
-
+    # Observation helper
     def _get_obs(self) -> np.ndarray:
         """Build a flat float32 observation vector."""
         obs: List[float] = []
@@ -85,8 +80,7 @@ class PatrolEnv(gymnasium.Env):
             obs.append(float(zone.risk_score >= HOTSPOT_RISK_THRESHOLD))
         return np.array(obs, dtype=np.float32)
 
-    # ── Gymnasium API ───────────────────────────────────────────────────
-
+    # Gymnasium API
     def reset(
         self,
         seed: Optional[int] = None,
@@ -104,7 +98,7 @@ class PatrolEnv(gymnasium.Env):
     ) -> Tuple[np.ndarray, float, bool, bool, dict]:
         """Apply zone assignments, simulate one tick, compute reward."""
 
-        # --- 1. apply action: move police to assigned zones ------------------
+        # Apply action: move police to assigned zones
         zone_assignment_counts: Dict[str, int] = {}
         for i, agent in enumerate(self.police_agents):
             target_idx = int(action[i]) % self.n_zones
@@ -123,7 +117,7 @@ class PatrolEnv(gymnasium.Env):
                 zone_assignment_counts.get(target_zid, 0) + 1
             )
 
-        # --- 2. simulate one tick: civilians then criminals ------------------
+        # Simulate one tick: civilians then criminals
         for civ in self.civilians:
             try:
                 civ.step(self.environment, [], 0)
@@ -139,7 +133,7 @@ class PatrolEnv(gymnasium.Env):
             except Exception:
                 pass
 
-        # --- 3. compute reward -----------------------------------------------
+        # Compute reward
         reward: float = 0.0
 
         for event in crimes_this_tick:
@@ -162,17 +156,14 @@ class PatrolEnv(gymnasium.Env):
             if response_ticks > RL_SLOW_RESPONSE_THRESHOLD:
                 reward += RL_REWARD_SLOW_RESPONSE
 
-        # --- 4. bookkeeping --------------------------------------------------
+        # Bookkeeping
         self.current_step += 1
         terminated = self.current_step >= self.max_steps
 
         return self._get_obs(), reward, terminated, False, {}
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # RL Agent wrapper
-# ─────────────────────────────────────────────────────────────────────────────
-
 class PatrolRLAgent:
     """Thin wrapper around a Stable-Baselines3 PPO model for patrol routing."""
 
@@ -181,8 +172,7 @@ class PatrolRLAgent:
         self.is_trained: bool = False
         self.device: str = "auto"  # will use GPU if available
 
-    # ── training ────────────────────────────────────────────────────────
-
+    # Training
     def train(
         self,
         environment: Any,
@@ -213,8 +203,7 @@ class PatrolRLAgent:
         self.is_trained = True
         print(f"[RL] Policy saved to {RL_POLICY_PATH}")
 
-    # ── loading ─────────────────────────────────────────────────────────
-
+    # Loading
     def load(
         self,
         path: Optional[str] = None,
@@ -264,7 +253,7 @@ class PatrolRLAgent:
             print(f"[RL] Failed to load policy: {exc}")
             return False
 
-    # ── inference ───────────────────────────────────────────────────────
+    # Inference
 
     def get_patrol_routes(
         self,
